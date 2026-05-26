@@ -74,9 +74,18 @@ GymFlow is a mobile fitness application inspired by Lyfta that helps gym-goers o
 - Additional compound exercises (8 exercises)
 
 ## Future Enhancements
-- Exercise GIF animations via ExerciseDB API integration
+- ~~Exercise GIF animations via ExerciseDB API integration~~ ✅ Done (83/83 mapped)
+- ~~Full Spanish localization~~ ✅ Done
+- ~~Real images on welcome screen~~ ✅ Done
 - Workout history tracking and progress charts
 - Exercise sets/reps logging during workout
 - Social features (share routines)
 - Muscle body map visualization (SVG diagrams)
 - Premium subscription for AI-powered workout recommendations
+
+## Recent Changes (this session)
+- ✅ Welcome screen: replaced Ionicon-based hero/feature icons with premium gym photographs (dark moody hero, anatomy/planner/dumbbells imagery for feature cards).
+- ✅ GIFs now display in every exercise reference: exercise list, exercise detail hero, similar/alternative exercises, workout planner cards on calendar, and workout creation picker + selected items.
+- ✅ Backend GIF mapping completed: 83/83 (100%) exercises mapped to RapidAPI ExerciseDB IDs (script `remap_missing_gifs.py` with manual overrides + target-based fuzzy fallback).
+- ✅ Profile tab title corrected to "Perfil", weekday/month labels in calendar translated, remaining English copy converted to Spanish (workout-create, exercise-detail error states, etc.).
+
