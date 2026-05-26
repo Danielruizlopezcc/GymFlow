@@ -17,11 +17,16 @@ const SecureStoreAdapter = {
 // ── Supabase client ──────────────────────────────────────────
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON, {
   auth: {
-    storage:           Platform.OS === 'web' ? undefined : SecureStoreAdapter,
-    autoRefreshToken:  true,
-    persistSession:    true,
+    storage:            Platform.OS === 'web' ? undefined : SecureStoreAdapter,
+    autoRefreshToken:   true,
+    persistSession:     true,
     detectSessionInUrl: Platform.OS === 'web',
-    flowType:          'pkce',          // más seguro para apps móviles
+    flowType:           'pkce',
+  },
+  realtime: {
+    // Deshabilitado: no usamos suscripciones en tiempo real
+    // Evita el error de WebSocket en Node.js < 22 durante el build estático
+    params: { eventsPerSecond: -1 },
   },
 });
 
