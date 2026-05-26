@@ -1,329 +1,310 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
-  TextInput, ScrollView, ActivityIndicator, StatusBar, Image
+  TextInput, StatusBar, Image, Dimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { COLORS, BODY_PART_COLORS, BODY_PART_ICONS, BODY_PART_ES, EQUIPMENT_ES } from '@/src/constants/theme';
+import {
+  COLORS, BODY_PART_COLORS, BODY_PART_ES, EQUIPMENT_ES,
+} from '@/src/constants/theme';
+import { filterExercises, BODY_PARTS, EXERCISES, type Exercise } from '@/src/data/exercises';
+import { getGifUrl } from '@/src/lib/supabase';
 
-const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL;
+const { width: SCREEN_W } = Dimensions.get('window');
+const CARD_W = (SCREEN_W - 20 * 2 - 12) / 2;
 
-interface Exercise {
-  exercise_id: string;
-  name: string;
-  body_part: string;
-  target: string;
-  equipment: string;
-  primary_muscles: string[];
-  secondary_muscles: string[];
-  category: string;
-}
+// Icono por grupo muscular
+const GROUP_ICONS: Record<string, string> = {
+  'chest':      'fitness',
+  'back':       'body',
+  'shoulders':  'accessibility',
+  'upper arms': 'barbell',
+  'lower arms': 'hand-right',
+  'upper legs': 'walk',
+  'lower legs': 'footsteps',
+  'waist':      'radio-button-on',
+};
+
+// Grupos musculares ordenados por nº de ejercicios (mayor primero)
+const MUSCLE_GROUPS = BODY_PARTS
+  .map(bp => ({
+    key:   bp,
+    label: BODY_PART_ES[bp] || bp,
+    color: BODY_PART_COLORS[bp] || COLORS.accent,
+    icon:  GROUP_ICONS[bp] || 'fitness',
+    count: EXERCISES.filter(e => e.body_part === bp).length,
+  }))
+  .sort((a, b) => b.count - a.count);
 
 export default function ExercisesScreen() {
-  const [exercises, setExercises] = useState<Exercise[]>([]);
-  const [bodyParts, setBodyParts] = useState<string[]>([]);
-  const [selectedBodyPart, setSelectedBodyPart] = useState<string>('');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [loading, setLoading] = useState(true);
-  const router = useRouter();
-  const insets = useSafeAreaInsets();
+  const [selectedBodyPart, setSelectedBodyPart] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery]           = useState('');
+  const router  = useRouter();
+  const insets  = useSafeAreaInsets();
 
-  const fetchExercises = useCallback(async () => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams();
-      if (selectedBodyPart) params.append('body_part', selectedBodyPart);
-      if (searchQuery) params.append('search', searchQuery);
-      const resp = await fetch(`${BACKEND_URL}/api/exercises?${params.toString()}`);
-      const data = await resp.json();
-      setExercises(data.exercises || []);
-    } catch (e) {
-      console.error('Fetch exercises error:', e);
-    } finally {
-      setLoading(false);
-    }
-  }, [selectedBodyPart, searchQuery]);
+  const exercises = useMemo(
+    () => selectedBodyPart
+      ? filterExercises({ bodyPart: selectedBodyPart, search: searchQuery })
+      : [],
+    [selectedBodyPart, searchQuery],
+  );
 
-  const fetchBodyParts = useCallback(async () => {
-    try {
-      const resp = await fetch(`${BACKEND_URL}/api/exercises/body-parts`);
-      const data = await resp.json();
-      setBodyParts(data.body_parts || []);
-    } catch (e) {
-      console.error('Fetch body parts error:', e);
-    }
-  }, []);
+  const selectedGroup = selectedBodyPart
+    ? MUSCLE_GROUPS.find(g => g.key === selectedBodyPart)
+    : null;
 
-  useEffect(() => {
-    fetchBodyParts();
-  }, []);
+  const goBack = () => {
+    setSelectedBodyPart(null);
+    setSearchQuery('');
+  };
 
-  useEffect(() => {
-    const debounce = setTimeout(fetchExercises, 300);
-    return () => clearTimeout(debounce);
-  }, [selectedBodyPart, searchQuery]);
-
+  // ── Tarjeta de ejercicio individual ──────────────────────────
   const renderExerciseCard = ({ item }: { item: Exercise }) => {
     const color = BODY_PART_COLORS[item.body_part] || COLORS.accent;
-    const gifUrl = `${BACKEND_URL}/api/exercises/${item.exercise_id}/gif`;
     return (
       <TouchableOpacity
         testID={`exercise-card-${item.exercise_id}`}
         style={styles.exerciseCard}
         onPress={() => router.push(`/exercise/${item.exercise_id}`)}
-        activeOpacity={0.7}
+        activeOpacity={0.72}
       >
-        <Image
-          source={{ uri: gifUrl }}
-          style={styles.exerciseGif}
-        />
+        <Image source={{ uri: getGifUrl(item.exercise_id) }} style={styles.exerciseGif} />
         <View style={styles.exerciseInfo}>
-          <Text style={styles.exerciseName} numberOfLines={1}>{item.name}</Text>
+          <Text style={styles.exerciseName} numberOfLines={2}>{item.name}</Text>
           <View style={styles.exerciseMeta}>
-            <View style={[styles.metaBadge, { backgroundColor: color + '15' }]}>
-              <Text style={[styles.metaBadgeText, { color }]}>{BODY_PART_ES[item.body_part] || item.body_part}</Text>
-            </View>
-            <View style={styles.metaBadge}>
-              <Text style={styles.metaBadgeText}>{EQUIPMENT_ES[item.equipment] || item.equipment}</Text>
+            <View style={[styles.metaBadge, { backgroundColor: color + '18' }]}>
+              <Text style={[styles.metaBadgeText, { color }]}>
+                {EQUIPMENT_ES[item.equipment] || item.equipment}
+              </Text>
             </View>
           </View>
-          <Text style={styles.exerciseMuscles} numberOfLines={1}>
-            {item.primary_muscles.join(', ')}
+          <Text style={styles.exerciseMuscle} numberOfLines={1}>
+            {item.primary_muscles[0]}
           </Text>
         </View>
-        <Ionicons name="chevron-forward" size={20} color={COLORS.textSecondary} />
+        <Ionicons name="chevron-forward" size={17} color={COLORS.border} />
       </TouchableOpacity>
     );
   };
 
-  return (
-    <View style={[styles.container, { paddingTop: insets.top }]} testID="exercises-screen">
-      <StatusBar barStyle="dark-content" />
+  // ════════════════════════════════════════════════════════════
+  // VISTA A — Cuadrícula de grupos musculares
+  // ════════════════════════════════════════════════════════════
+  if (!selectedBodyPart) {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top }]} testID="exercises-screen">
+        <StatusBar barStyle="dark-content" />
 
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>EJERCICIOS</Text>
-        <Text style={styles.headerSubtitle}>{exercises.length} ejercicios disponibles</Text>
-      </View>
-
-      <View style={styles.searchContainer}>
-        <View style={styles.searchBar}>
-          <Ionicons name="search" size={20} color={COLORS.textSecondary} />
-          <TextInput
-            testID="exercise-search-input"
-            style={styles.searchInput}
-            placeholder="Buscar ejercicios..."
-            placeholderTextColor={COLORS.textSecondary}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-          {searchQuery ? (
-            <TouchableOpacity onPress={() => setSearchQuery('')} testID="clear-search-btn">
-              <Ionicons name="close-circle" size={20} color={COLORS.textSecondary} />
-            </TouchableOpacity>
-          ) : null}
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>EJERCICIOS</Text>
+          <Text style={styles.headerSub}>¿Qué vas a trabajar hoy?</Text>
         </View>
-      </View>
 
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.filterContainer}
-      >
-        <TouchableOpacity
-          testID="filter-all"
-          style={[styles.filterPill, !selectedBodyPart && styles.filterPillActive]}
-          onPress={() => setSelectedBodyPart('')}
-        >
-          <Text style={[styles.filterText, !selectedBodyPart && styles.filterTextActive]}>Todos</Text>
-        </TouchableOpacity>
-        {bodyParts.map((bp) => {
-          const isActive = selectedBodyPart === bp;
-          const color = BODY_PART_COLORS[bp] || COLORS.accent;
-          return (
-            <TouchableOpacity
-              key={bp}
-              testID={`filter-${bp.replace(/\s+/g, '-')}`}
-              style={[
-                styles.filterPill,
-                isActive && { backgroundColor: color, borderColor: color },
-              ]}
-              onPress={() => setSelectedBodyPart(isActive ? '' : bp)}
-            >
-              <Text style={[styles.filterText, isActive && styles.filterTextActive]}>
-                {BODY_PART_ES[bp] || bp}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
-
-      {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={COLORS.accent} />
-        </View>
-      ) : (
         <FlatList
-          data={exercises}
-          keyExtractor={(item) => item.exercise_id}
-          renderItem={renderExerciseCard}
-          contentContainerStyle={styles.listContent}
+          data={MUSCLE_GROUPS}
+          keyExtractor={item => item.key}
+          numColumns={2}
+          contentContainerStyle={styles.gridContent}
+          columnWrapperStyle={{ gap: 12 }}
           showsVerticalScrollIndicator={false}
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Ionicons name="search-outline" size={48} color={COLORS.textSecondary} />
-              <Text style={styles.emptyText}>No se encontraron ejercicios</Text>
-              <Text style={styles.emptySubtext}>Prueba con otro filtro o búsqueda</Text>
-            </View>
-          }
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              testID={`muscle-group-${item.key}`}
+              style={[styles.groupCard, { width: CARD_W, backgroundColor: item.color }]}
+              onPress={() => setSelectedBodyPart(item.key)}
+              activeOpacity={0.82}
+            >
+              {/* Icono grande de fondo (decorativo) */}
+              <Ionicons
+                name={item.icon as any}
+                size={64}
+                color="rgba(255,255,255,0.15)"
+                style={styles.groupCardBgIcon}
+              />
+              {/* Contenido */}
+              <View style={styles.groupCardContent}>
+                <Ionicons name={item.icon as any} size={26} color="#fff" />
+                <Text style={styles.groupCardLabel}>{item.label}</Text>
+                <Text style={styles.groupCardCount}>{item.count} ejercicios</Text>
+              </View>
+            </TouchableOpacity>
+          )}
         />
-      )}
+      </View>
+    );
+  }
+
+  // ════════════════════════════════════════════════════════════
+  // VISTA B — Lista de ejercicios del grupo
+  // ════════════════════════════════════════════════════════════
+  const groupColor = selectedGroup?.color || COLORS.accent;
+
+  return (
+    <View style={[styles.container, { paddingTop: insets.top }]} testID="exercises-list-screen">
+      <StatusBar barStyle="light-content" />
+
+      {/* Cabecera coloreada */}
+      <View style={[styles.listHeader, { backgroundColor: groupColor }]}>
+        <TouchableOpacity
+          testID="back-to-groups-btn"
+          onPress={goBack}
+          style={styles.backBtn}
+        >
+          <Ionicons name="arrow-back" size={22} color="#fff" />
+        </TouchableOpacity>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.listHeaderTitle}>{selectedGroup?.label.toUpperCase()}</Text>
+          <Text style={styles.listHeaderSub}>{exercises.length} ejercicios</Text>
+        </View>
+        <Ionicons name={selectedGroup?.icon as any} size={28} color="rgba(255,255,255,0.35)" />
+      </View>
+
+      {/* Buscador */}
+      <View style={styles.searchBox}>
+        <Ionicons name="search" size={17} color={COLORS.textSecondary} />
+        <TextInput
+          testID="exercise-search-input"
+          style={styles.searchInput}
+          placeholder="Buscar ejercicio o músculo..."
+          placeholderTextColor={COLORS.textSecondary}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+        />
+        {searchQuery ? (
+          <TouchableOpacity onPress={() => setSearchQuery('')} testID="clear-search-btn">
+            <Ionicons name="close-circle" size={17} color={COLORS.textSecondary} />
+          </TouchableOpacity>
+        ) : null}
+      </View>
+
+      {/* Lista */}
+      <FlatList
+        data={exercises}
+        keyExtractor={item => item.exercise_id}
+        renderItem={renderExerciseCard}
+        contentContainerStyle={styles.listContent}
+        showsVerticalScrollIndicator={false}
+        ListEmptyComponent={
+          <View style={styles.empty}>
+            <Ionicons name="search-outline" size={42} color={COLORS.border} />
+            <Text style={styles.emptyText}>Sin resultados</Text>
+          </View>
+        }
+      />
     </View>
   );
 }
 
+// ── Estilos ───────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.surface,
-  },
+  container: { flex: 1, backgroundColor: COLORS.surface },
+
+  // ─── Cabecera pantalla principal ──────────────────────────
   header: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 8,
+    paddingHorizontal: 20, paddingTop: 16, paddingBottom: 14,
     backgroundColor: COLORS.background,
+    borderBottomWidth: 1, borderBottomColor: COLORS.border,
   },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: '900',
-    color: COLORS.text,
-    letterSpacing: 2,
+  headerTitle: { fontSize: 28, fontWeight: '900', color: COLORS.text, letterSpacing: 2 },
+  headerSub:   { fontSize: 14, color: COLORS.textSecondary, marginTop: 2 },
+
+  // ─── Grid de cuadros de grupo muscular ───────────────────
+  gridContent: { padding: 20, paddingBottom: 110, gap: 12 },
+
+  groupCard: {
+    height:        130,
+    borderRadius:  16,
+    overflow:      'hidden',
+    justifyContent:'flex-end',
+    elevation:     3,
+    shadowColor:   '#000',
+    shadowOpacity: 0.14,
+    shadowOffset:  { width: 0, height: 2 },
+    shadowRadius:  8,
   },
-  headerSubtitle: {
-    fontSize: 14,
-    color: COLORS.textSecondary,
-    marginTop: 4,
+  groupCardBgIcon: {
+    position: 'absolute',
+    right: -6,
+    top:   10,
   },
-  searchContainer: {
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    backgroundColor: COLORS.background,
+  groupCardContent: {
+    padding: 14,
+    gap:     4,
   },
-  searchBar: {
+  groupCardLabel: {
+    fontSize:    17,
+    fontWeight:  '800',
+    color:       '#fff',
+    letterSpacing: 0.4,
+    marginTop:   4,
+  },
+  groupCardCount: {
+    fontSize:  12,
+    fontWeight:'500',
+    color:     'rgba(255,255,255,0.78)',
+  },
+
+  // ─── Cabecera de lista de grupo ───────────────────────────
+  listHeader: {
+    flexDirection:  'row',
+    alignItems:     'center',
+    paddingHorizontal: 16,
+    paddingVertical: 18,
+    gap: 14,
+  },
+  backBtn: {
+    width: 36, height: 36,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  listHeaderTitle: {
+    fontSize: 20, fontWeight: '900', color: '#fff', letterSpacing: 1.2,
+  },
+  listHeaderSub: {
+    fontSize: 13, color: 'rgba(255,255,255,0.75)', fontWeight: '500', marginTop: 1,
+  },
+
+  // ─── Buscador ─────────────────────────────────────────────
+  searchBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.surface,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    height: 48,
-    gap: 10,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 16,
-    color: COLORS.text,
-  },
-  filterContainer: {
-    paddingHorizontal: 20,
-    paddingVertical: 12,
+    marginHorizontal: 16,
+    marginVertical: 10,
+    backgroundColor: COLORS.cardBg,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    height: 42,
     gap: 8,
-    backgroundColor: COLORS.background,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-  },
-  filterPill: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1.5,
+    borderWidth: 1,
     borderColor: COLORS.border,
-    backgroundColor: COLORS.background,
-    marginRight: 8,
   },
-  filterPillActive: {
-    backgroundColor: COLORS.accent,
-    borderColor: COLORS.accent,
-  },
-  filterText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: COLORS.text,
-    textTransform: 'capitalize',
-  },
-  filterTextActive: {
-    color: COLORS.white,
-  },
-  listContent: {
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 100,
-  },
+  searchInput: { flex: 1, fontSize: 14, color: COLORS.text },
+
+  // ─── Tarjeta de ejercicio ─────────────────────────────────
+  listContent: { paddingHorizontal: 16, paddingBottom: 110 },
   exerciseCard: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: COLORS.cardBg,
-    borderRadius: 16,
-    padding: 12,
-    marginBottom: 10,
+    borderRadius: 14,
+    padding: 11,
+    marginBottom: 8,
     borderWidth: 1,
     borderColor: COLORS.border,
     gap: 12,
   },
-  exerciseGif: {
-    width: 60,
-    height: 60,
-    borderRadius: 12,
-    backgroundColor: COLORS.surface,
-  },
-  exerciseInfo: {
-    flex: 1,
-  },
-  exerciseName: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: COLORS.text,
-  },
-  exerciseMeta: {
-    flexDirection: 'row',
-    gap: 6,
-    marginTop: 6,
-  },
-  metaBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-    backgroundColor: COLORS.surface,
-  },
-  metaBadgeText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: COLORS.textSecondary,
-    textTransform: 'capitalize',
-  },
-  exerciseMuscles: {
-    fontSize: 12,
-    color: COLORS.textSecondary,
-    marginTop: 4,
-  },
-  loadingContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingTop: 60,
-    gap: 8,
-  },
-  emptyText: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: COLORS.text,
-  },
-  emptySubtext: {
-    fontSize: 14,
-    color: COLORS.textSecondary,
-  },
+  exerciseGif:    { width: 62, height: 62, borderRadius: 11, backgroundColor: COLORS.surface },
+  exerciseInfo:   { flex: 1 },
+  exerciseName:   { fontSize: 15, fontWeight: '700', color: COLORS.text, lineHeight: 20 },
+  exerciseMeta:   { flexDirection: 'row', marginTop: 5 },
+  metaBadge:      { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+  metaBadgeText:  { fontSize: 11, fontWeight: '700', textTransform: 'capitalize' },
+  exerciseMuscle: { fontSize: 12, color: COLORS.textSecondary, marginTop: 4, textTransform: 'capitalize' },
+
+  // ─── Estado vacío ─────────────────────────────────────────
+  empty:     { alignItems: 'center', paddingTop: 60, gap: 10 },
+  emptyText: { fontSize: 16, fontWeight: '600', color: COLORS.textSecondary },
 });

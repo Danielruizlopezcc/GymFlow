@@ -1,23 +1,25 @@
-import React, { useEffect } from 'react';
+/**
+ * Pantalla de callback de autenticación.
+ *
+ * Con Supabase Auth:
+ * - Web: el cliente detecta el token del hash automáticamente.
+ *   Redirigimos directamente a la raíz y el AuthProvider se encarga.
+ * - Mobile: el flujo PKCE se maneja en AuthContext.login().
+ *   Si el deep link aterriza aquí, simplemente volvemos a la raíz.
+ */
+import { useEffect } from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useAuth } from '@/src/contexts/AuthContext';
+import { useRouter } from 'expo-router';
 import { COLORS } from '@/src/constants/theme';
 
 export default function AuthCallback() {
-  const { processSessionId } = useAuth();
-  const params = useLocalSearchParams<{ session_id?: string }>();
   const router = useRouter();
 
   useEffect(() => {
-    const handle = async () => {
-      if (params.session_id) {
-        await processSessionId(params.session_id);
-      }
-      router.replace('/');
-    };
-    handle();
-  }, [params.session_id]);
+    // El AuthProvider detecta el cambio de sesión vía onAuthStateChange.
+    // Solo necesitamos redirigir al inicio.
+    router.replace('/');
+  }, []);
 
   return (
     <View style={styles.container}>

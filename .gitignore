@@ -86,3 +86,16 @@ android-sdk/
 credentials.json
 *.key
 .credentials
+
+# Expo / React Native
+frontend/.expo/
+frontend/public/
+frontend/dist/
+frontend/.output/
+frontend/.metro-cache/
+*.ipa
+*.apk
+*.aab
+
+# GIF cache local (las imágenes ya están en Supabase Storage, no hace falta en git)
+backend/gif_cache/

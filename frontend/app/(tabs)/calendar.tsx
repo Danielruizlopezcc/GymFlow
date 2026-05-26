@@ -1,85 +1,71 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  ActivityIndicator, StatusBar, Alert, Image
+  ActivityIndicator, StatusBar, Alert, Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { storage } from '@/src/utils/storage';
 import { COLORS } from '@/src/constants/theme';
+import { listWorkouts, deleteWorkout, type Workout } from '@/src/lib/workouts';
+import { getGifUrl } from '@/src/lib/supabase';
 
-const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL;
-const DAYS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
-const MONTHS = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+const DAYS   = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
+                'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
-interface Workout {
-  workout_id: string;
-  date: string;
-  name: string;
-  exercises: { exercise_id: string; name: string; sets: number; reps: string; }[];
+function formatDate(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+function getMonthStr(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
 export default function CalendarScreen() {
-  const [currentDate, setCurrentDate] = useState(new Date());
+  const [currentDate, setCurrentDate]   = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(formatDate(new Date()));
-  const [workouts, setWorkouts] = useState<Workout[]>([]);
+  const [workouts, setWorkouts]         = useState<Workout[]>([]);
   const [workoutDates, setWorkoutDates] = useState<Set<string>>(new Set());
-  const [loading, setLoading] = useState(true);
-  const router = useRouter();
-  const insets = useSafeAreaInsets();
+  const [loading, setLoading]           = useState(true);
+  const [refreshing, setRefreshing]     = useState(false);
+  const router  = useRouter();
+  const insets  = useSafeAreaInsets();
 
-  function formatDate(d: Date): string {
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  }
-
-  function getMonthStr(d: Date): string {
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-  }
-
-  const fetchWorkouts = useCallback(async () => {
-    setLoading(true);
+  const fetchWorkouts = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
+    else setRefreshing(true);
     try {
-      const token = await storage.secureGet('session_token', '');
-      const month = getMonthStr(currentDate);
-      const resp = await fetch(`${BACKEND_URL}/api/workouts?month=${month}`, {
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
-      if (resp.ok) {
-        const data = await resp.json();
-        setWorkouts(data.workouts || []);
-        const dates = new Set<string>((data.workouts || []).map((w: Workout) => w.date));
-        setWorkoutDates(dates);
-      }
+      const data = await listWorkouts({ month: getMonthStr(currentDate) });
+      setWorkouts(data);
+      setWorkoutDates(new Set(data.map(w => w.date)));
     } catch (e) {
-      console.error('Fetch workouts error:', e);
+      console.error('[Calendar] fetchWorkouts:', e);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, [currentDate]);
 
-  useEffect(() => {
-    fetchWorkouts();
-  }, [currentDate]);
+  useEffect(() => { fetchWorkouts(); }, [currentDate]);
 
-  const deleteWorkout = async (workoutId: string) => {
-    try {
-      const token = await storage.secureGet('session_token', '');
-      await fetch(`${BACKEND_URL}/api/workouts/${workoutId}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
-      fetchWorkouts();
-    } catch (e) {
-      console.error('Delete workout error:', e);
-    }
-  };
-
-  const confirmDelete = (workoutId: string) => {
-    Alert.alert('Eliminar Entrenamiento', '¿Estás seguro de que quieres eliminar este entrenamiento?', [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Eliminar', style: 'destructive', onPress: () => deleteWorkout(workoutId) },
-    ]);
+  const handleDelete = async (workoutId: string) => {
+    Alert.alert(
+      'Eliminar Entrenamiento',
+      '¿Seguro que quieres eliminar este entrenamiento?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Eliminar', style: 'destructive', onPress: async () => {
+            try {
+              await deleteWorkout(workoutId);
+              fetchWorkouts(true);
+            } catch {
+              Alert.alert('Error', 'No se pudo eliminar el entrenamiento');
+            }
+          },
+        },
+      ]
+    );
   };
 
   const navigateMonth = (dir: number) => {
@@ -88,24 +74,34 @@ export default function CalendarScreen() {
     setCurrentDate(d);
   };
 
-  // Calendar Grid
-  const year = currentDate.getFullYear();
-  const month = currentDate.getMonth();
-  const firstDay = new Date(year, month, 1).getDay();
+  // ── Datos del calendario ──────────────────────────────────
+  const year        = currentDate.getFullYear();
+  const month       = currentDate.getMonth();
+  const firstDay    = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const calendarDays: (number | null)[] = [];
   for (let i = 0; i < firstDay; i++) calendarDays.push(null);
   for (let i = 1; i <= daysInMonth; i++) calendarDays.push(i);
 
-  const selectedWorkouts = workouts.filter((w) => w.date === selectedDate);
-  const today = formatDate(new Date());
+  const selectedWorkouts = workouts.filter(w => w.date === selectedDate);
+  const today            = formatDate(new Date());
+
+  const selectedLabel = selectedDate === today
+    ? 'Hoy'
+    : new Date(selectedDate + 'T12:00:00').toLocaleDateString('es-ES', {
+        weekday: 'long', month: 'long', day: 'numeric',
+      });
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]} testID="calendar-screen">
       <StatusBar barStyle="dark-content" />
 
+      {/* Cabecera */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>PLANIFICADOR</Text>
+        <View>
+          <Text style={styles.headerTitle}>PLANIFICADOR</Text>
+          <Text style={styles.headerSub}>{MONTHS[month]} {year}</Text>
+        </View>
         <TouchableOpacity
           testID="create-workout-btn"
           style={styles.addBtn}
@@ -116,31 +112,31 @@ export default function CalendarScreen() {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Month Navigation */}
+        {/* Navegación de mes */}
         <View style={styles.monthNav}>
-          <TouchableOpacity onPress={() => navigateMonth(-1)} testID="prev-month-btn">
-            <Ionicons name="chevron-back" size={24} color={COLORS.text} />
+          <TouchableOpacity onPress={() => navigateMonth(-1)} testID="prev-month-btn" style={styles.navBtn}>
+            <Ionicons name="chevron-back" size={20} color={COLORS.text} />
           </TouchableOpacity>
           <Text style={styles.monthText}>{MONTHS[month]} {year}</Text>
-          <TouchableOpacity onPress={() => navigateMonth(1)} testID="next-month-btn">
-            <Ionicons name="chevron-forward" size={24} color={COLORS.text} />
+          <TouchableOpacity onPress={() => navigateMonth(1)} testID="next-month-btn" style={styles.navBtn}>
+            <Ionicons name="chevron-forward" size={20} color={COLORS.text} />
           </TouchableOpacity>
         </View>
 
-        {/* Day Headers */}
+        {/* Cabeceras de día */}
         <View style={styles.dayHeaders}>
-          {DAYS.map((d) => (
+          {DAYS.map(d => (
             <Text key={d} style={styles.dayHeaderText}>{d}</Text>
           ))}
         </View>
 
-        {/* Calendar Grid */}
+        {/* Grid del calendario */}
         <View style={styles.calendarGrid}>
           {calendarDays.map((day, idx) => {
             if (day === null) return <View key={`empty-${idx}`} style={styles.calendarCell} />;
-            const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            const dateStr    = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
             const isSelected = dateStr === selectedDate;
-            const isToday = dateStr === today;
+            const isToday    = dateStr === today;
             const hasWorkout = workoutDates.has(dateStr);
             return (
               <TouchableOpacity
@@ -161,68 +157,86 @@ export default function CalendarScreen() {
                   {day}
                 </Text>
                 {hasWorkout && (
-                  <View style={[
-                    styles.workoutDot,
-                    isSelected && styles.workoutDotSelected,
-                  ]} />
+                  <View style={[styles.workoutDot, isSelected && styles.workoutDotSelected]} />
                 )}
               </TouchableOpacity>
             );
           })}
         </View>
 
-        {/* Selected Day Workouts */}
-        <View style={styles.selectedDaySection}>
-          <View style={styles.selectedDayHeader}>
-            <Text style={styles.selectedDayTitle}>
-              {selectedDate === today ? 'Hoy' : new Date(selectedDate + 'T12:00:00').toLocaleDateString('es-ES', { weekday: 'long', month: 'short', day: 'numeric' })}
-            </Text>
+        {/* Sección del día seleccionado */}
+        <View style={styles.daySection}>
+          {/* Título del día + botón añadir inline */}
+          <View style={styles.daySectionHeader}>
+            <Text style={styles.daySectionTitle} numberOfLines={1}>{selectedLabel}</Text>
+            <TouchableOpacity
+              style={styles.inlineAddBtn}
+              onPress={() => router.push({ pathname: '/workout/create', params: { date: selectedDate } })}
+            >
+              <Ionicons name="add" size={16} color={COLORS.accent} />
+              <Text style={styles.inlineAddText}>Nuevo</Text>
+            </TouchableOpacity>
           </View>
 
+          {/* Loading */}
           {loading ? (
-            <ActivityIndicator size="small" color={COLORS.accent} style={{ marginTop: 20 }} />
+            <ActivityIndicator size="small" color={COLORS.accent} style={{ marginTop: 24 }} />
           ) : selectedWorkouts.length > 0 ? (
-            selectedWorkouts.map((w) => (
-              <View key={w.workout_id} style={styles.workoutCard} testID={`workout-card-${w.workout_id}`}>
+
+            /* Tarjetas de entrenamiento */
+            selectedWorkouts.map(w => (
+              <View key={w.id} style={styles.workoutCard} testID={`workout-card-${w.id}`}>
+
+                {/* Cabecera de la tarjeta */}
                 <View style={styles.workoutCardHeader}>
-                  <View style={styles.workoutNameRow}>
-                    <View style={[styles.workoutDotLarge, { backgroundColor: COLORS.accent }]} />
-                    <Text style={styles.workoutName}>{w.name}</Text>
-                  </View>
+                  <View style={[styles.colorDot, { backgroundColor: COLORS.accent }]} />
+                  <Text style={styles.workoutName} numberOfLines={1}>{w.name}</Text>
+                  <Text style={styles.workoutExCount}>{w.exercises.length} ejerc.</Text>
+                  {/* Botón Editar */}
                   <TouchableOpacity
-                    testID={`delete-workout-${w.workout_id}`}
-                    onPress={() => confirmDelete(w.workout_id)}
+                    testID={`edit-workout-${w.id}`}
+                    style={styles.iconBtn}
+                    onPress={() => router.push({
+                      pathname: '/workout/create',
+                      params: { date: w.date, workoutId: w.id },
+                    })}
+                  >
+                    <Ionicons name="create-outline" size={18} color={COLORS.accent} />
+                  </TouchableOpacity>
+                  {/* Botón Eliminar */}
+                  <TouchableOpacity
+                    testID={`delete-workout-${w.id}`}
+                    style={styles.iconBtn}
+                    onPress={() => handleDelete(w.id)}
                   >
                     <Ionicons name="trash-outline" size={18} color={COLORS.danger} />
                   </TouchableOpacity>
                 </View>
-                {w.exercises.map((ex, i) => (
-                  <View key={i} style={styles.workoutExerciseRow}>
-                    <Image
-                      source={{ uri: `${BACKEND_URL}/api/exercises/${ex.exercise_id}/gif` }}
-                      style={styles.workoutExerciseGif}
-                    />
-                    <Text style={styles.workoutExerciseName} numberOfLines={1}>{ex.name}</Text>
-                    <Text style={styles.workoutExerciseSets}>{ex.sets}×{ex.reps}</Text>
-                  </View>
-                ))}
-                {w.exercises.length === 0 && (
-                  <Text style={styles.noExercisesText}>Aún no hay ejercicios añadidos</Text>
+
+                {/* Ejercicios */}
+                {w.exercises.length === 0 ? (
+                  <Text style={styles.noExText}>Sin ejercicios aún</Text>
+                ) : (
+                  w.exercises.map((ex, i) => (
+                    <View key={i} style={styles.exRow}>
+                      <Image source={{ uri: getGifUrl(ex.exercise_id) }} style={styles.exGif} />
+                      <Text style={styles.exName} numberOfLines={1}>{ex.name}</Text>
+                      <Text style={styles.exSets}>{ex.sets}×{ex.reps}</Text>
+                      {ex.weight ? (
+                        <Text style={styles.exWeight}>{ex.weight} kg</Text>
+                      ) : null}
+                    </View>
+                  ))
                 )}
               </View>
             ))
+
           ) : (
+            /* Estado vacío */
             <View style={styles.emptyDay}>
-              <Ionicons name="calendar-outline" size={40} color={COLORS.border} />
-              <Text style={styles.emptyDayText}>Sin entrenamientos planificados</Text>
-              <TouchableOpacity
-                testID="add-workout-empty-btn"
-                style={styles.addWorkoutBtn}
-                onPress={() => router.push({ pathname: '/workout/create', params: { date: selectedDate } })}
-              >
-                <Ionicons name="add" size={18} color={COLORS.white} />
-                <Text style={styles.addWorkoutBtnText}>Añadir Entrenamiento</Text>
-              </TouchableOpacity>
+              <Ionicons name="calendar-outline" size={44} color={COLORS.border} />
+              <Text style={styles.emptyDayTitle}>Sin entrenamientos</Text>
+              <Text style={styles.emptyDayDesc}>Toca "Nuevo" para planificar este día</Text>
             </View>
           )}
         </View>
@@ -232,80 +246,106 @@ export default function CalendarScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.surface },
+  container:    { flex: 1, backgroundColor: COLORS.surface },
+
+  // ─── Cabecera ──────────────────────────────────────────
   header: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12, backgroundColor: COLORS.background,
+    paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12,
+    backgroundColor: COLORS.background,
+    borderBottomWidth: 1, borderBottomColor: COLORS.border,
   },
-  headerTitle: { fontSize: 28, fontWeight: '900', color: COLORS.text, letterSpacing: 2 },
+  headerTitle: { fontSize: 24, fontWeight: '900', color: COLORS.text, letterSpacing: 2 },
+  headerSub:   { fontSize: 13, color: COLORS.textSecondary, marginTop: 1 },
   addBtn: {
-    width: 40, height: 40, borderRadius: 12, backgroundColor: COLORS.accent,
-    alignItems: 'center', justifyContent: 'center',
+    width: 40, height: 40, borderRadius: 12,
+    backgroundColor: COLORS.accent, alignItems: 'center', justifyContent: 'center',
   },
+
+  // ─── Mes ───────────────────────────────────────────────
   monthNav: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: 20, paddingVertical: 16, backgroundColor: COLORS.background,
+    paddingHorizontal: 20, paddingVertical: 14,
+    backgroundColor: COLORS.background,
   },
-  monthText: { fontSize: 18, fontWeight: '700', color: COLORS.text },
+  navBtn:    { padding: 4 },
+  monthText: { fontSize: 16, fontWeight: '700', color: COLORS.text },
+
+  // ─── Grid ─────────────────────────────────────────────
   dayHeaders: {
     flexDirection: 'row', paddingHorizontal: 12,
     backgroundColor: COLORS.background, paddingBottom: 8,
   },
   dayHeaderText: {
-    flex: 1, textAlign: 'center', fontSize: 12, fontWeight: '600',
-    color: COLORS.textSecondary, textTransform: 'uppercase', letterSpacing: 1,
+    flex: 1, textAlign: 'center',
+    fontSize: 11, fontWeight: '600',
+    color: COLORS.textSecondary, textTransform: 'uppercase', letterSpacing: 0.8,
   },
   calendarGrid: {
-    flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 12, paddingBottom: 16,
-    backgroundColor: COLORS.background, borderBottomWidth: 1, borderBottomColor: COLORS.border,
+    flexDirection: 'row', flexWrap: 'wrap',
+    paddingHorizontal: 12, paddingBottom: 16,
+    backgroundColor: COLORS.background,
+    borderBottomWidth: 1, borderBottomColor: COLORS.border,
   },
-  calendarCell: {
-    width: '14.28%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center',
-    position: 'relative',
+  calendarCell:           { width: '14.28%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center' },
+  calendarCellSelected:   { backgroundColor: COLORS.accent, borderRadius: 12 },
+  calendarCellToday:      { borderWidth: 2, borderColor: COLORS.accent, borderRadius: 12 },
+  calendarDayText:        { fontSize: 14, fontWeight: '500', color: COLORS.text },
+  calendarDayTextSelected:{ color: COLORS.white, fontWeight: '700' },
+  calendarDayTextToday:   { color: COLORS.accent, fontWeight: '700' },
+  workoutDot:             { width: 5, height: 5, borderRadius: 3, backgroundColor: COLORS.accent, position: 'absolute', bottom: 5 },
+  workoutDotSelected:     { backgroundColor: COLORS.white },
+
+  // ─── Sección del día ───────────────────────────────────
+  daySection: { padding: 16 },
+
+  daySectionHeader: {
+    flexDirection: 'row', alignItems: 'center',
+    justifyContent: 'space-between', marginBottom: 14,
   },
-  calendarCellSelected: {
-    backgroundColor: COLORS.accent, borderRadius: 14,
+  daySectionTitle: {
+    fontSize: 18, fontWeight: '800', color: COLORS.text,
+    flex: 1, textTransform: 'capitalize',
   },
-  calendarCellToday: {
-    borderWidth: 2, borderColor: COLORS.accent, borderRadius: 14,
+  inlineAddBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 12, paddingVertical: 6,
+    borderRadius: 20, borderWidth: 1.5, borderColor: COLORS.accent,
   },
-  calendarDayText: { fontSize: 15, fontWeight: '500', color: COLORS.text },
-  calendarDayTextSelected: { color: COLORS.white, fontWeight: '700' },
-  calendarDayTextToday: { color: COLORS.accent, fontWeight: '700' },
-  workoutDot: {
-    width: 5, height: 5, borderRadius: 3, backgroundColor: COLORS.accent,
-    position: 'absolute', bottom: 6,
-  },
-  workoutDotSelected: { backgroundColor: COLORS.white },
-  selectedDaySection: { padding: 20 },
-  selectedDayHeader: { marginBottom: 16 },
-  selectedDayTitle: { fontSize: 20, fontWeight: '800', color: COLORS.text },
+  inlineAddText: { fontSize: 13, fontWeight: '700', color: COLORS.accent },
+
+  // ─── Tarjeta de entrenamiento ──────────────────────────
   workoutCard: {
-    backgroundColor: COLORS.cardBg, borderRadius: 16, padding: 16,
+    backgroundColor: COLORS.cardBg, borderRadius: 16, padding: 14,
     marginBottom: 12, borderWidth: 1, borderColor: COLORS.border,
   },
   workoutCardHeader: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12,
+    flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10,
   },
-  workoutNameRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  workoutDotLarge: { width: 10, height: 10, borderRadius: 5 },
-  workoutName: { fontSize: 17, fontWeight: '700', color: COLORS.text },
-  workoutExerciseRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    paddingVertical: 8, borderTopWidth: 1, borderTopColor: COLORS.surface,
+  colorDot:     { width: 10, height: 10, borderRadius: 5 },
+  workoutName:  { fontSize: 16, fontWeight: '700', color: COLORS.text, flex: 1 },
+  workoutExCount:{ fontSize: 12, fontWeight: '600', color: COLORS.textSecondary },
+  iconBtn: {
+    width: 32, height: 32, borderRadius: 8,
+    backgroundColor: COLORS.surface,
+    alignItems: 'center', justifyContent: 'center',
   },
-  workoutExerciseGif: {
-    width: 40, height: 40, borderRadius: 10, backgroundColor: COLORS.surface,
+
+  // ─── Fila de ejercicio dentro de tarjeta ──────────────
+  exRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingVertical: 8,
+    borderTopWidth: 1, borderTopColor: COLORS.surface,
   },
-  workoutExerciseName: { fontSize: 14, color: COLORS.text, flex: 1, fontWeight: '500' },
-  workoutExerciseSets: { fontSize: 13, fontWeight: '700', color: COLORS.accent },
-  noExercisesText: { fontSize: 14, color: COLORS.textSecondary, fontStyle: 'italic' },
-  emptyDay: { alignItems: 'center', paddingTop: 40, gap: 12 },
-  emptyDayText: { fontSize: 16, color: COLORS.textSecondary },
-  addWorkoutBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: COLORS.accent, paddingHorizontal: 20, paddingVertical: 12,
-    borderRadius: 24, marginTop: 8,
-  },
-  addWorkoutBtnText: { fontSize: 15, fontWeight: '700', color: COLORS.white },
+  exGif:    { width: 38, height: 38, borderRadius: 9, backgroundColor: COLORS.surface },
+  exName:   { fontSize: 13, color: COLORS.text, flex: 1, fontWeight: '500' },
+  exSets:   { fontSize: 13, fontWeight: '700', color: COLORS.accent },
+  exWeight: { fontSize: 12, fontWeight: '600', color: COLORS.textSecondary },
+
+  noExText: { fontSize: 13, color: COLORS.textSecondary, fontStyle: 'italic', paddingTop: 4 },
+
+  // ─── Vacío ─────────────────────────────────────────────
+  emptyDay:      { alignItems: 'center', paddingTop: 44, paddingBottom: 24, gap: 8 },
+  emptyDayTitle: { fontSize: 17, fontWeight: '700', color: COLORS.textSecondary },
+  emptyDayDesc:  { fontSize: 13, color: COLORS.tabInactive, textAlign: 'center' },
 });

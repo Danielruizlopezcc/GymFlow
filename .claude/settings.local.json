@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem \"c:\\\\Users\\\\danie_epmcijo\\\\OneDrive\\\\Desktop\\\\GymFlow\\\\backend\\\\gif_cache\" -Filter \"*.gif\")",
+      "Bash(Measure-Object)",
+      "Bash(Select-Object -ExpandProperty Count)"
+    ]
+  }
+}

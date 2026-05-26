@@ -4,7 +4,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useAuth } from '@/src/contexts/AuthContext';
+import { useAuth, type AppUser } from '@/src/contexts/AuthContext';
 import { COLORS } from '@/src/constants/theme';
 
 export default function ProfileScreen() {
