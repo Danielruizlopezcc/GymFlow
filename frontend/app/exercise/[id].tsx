@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  ActivityIndicator, StatusBar, FlatList
+  ActivityIndicator, StatusBar, Image
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -97,15 +97,13 @@ export default function ExerciseDetailScreen() {
         <View style={{ width: 40 }} />
       </View>
 
-      {/* Hero Section */}
+      {/* Hero Section - GIF */}
       <View style={[styles.heroSection, { backgroundColor: bodyColor + '10' }]}>
-        <View style={[styles.heroIconContainer, { backgroundColor: bodyColor + '20' }]}>
-          <Ionicons
-            name={(BODY_PART_ICONS[exercise.body_part] || 'barbell-outline') as any}
-            size={64}
-            color={bodyColor}
-          />
-        </View>
+        <Image
+          source={{ uri: `${BACKEND_URL}/api/exercises/${exercise.exercise_id}/gif` }}
+          style={styles.heroGif}
+          resizeMode="contain"
+        />
         <View style={styles.heroMeta}>
           <View style={[styles.heroBadge, { backgroundColor: bodyColor + '20' }]}>
             <Text style={[styles.heroBadgeText, { color: bodyColor }]}>
@@ -259,10 +257,10 @@ const styles = StyleSheet.create({
   backBtn: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { fontSize: 18, fontWeight: '800', color: COLORS.text, flex: 1, textAlign: 'center' },
   heroSection: {
-    alignItems: 'center', paddingVertical: 32, borderBottomWidth: 1, borderBottomColor: COLORS.border,
+    alignItems: 'center', paddingVertical: 20, borderBottomWidth: 1, borderBottomColor: COLORS.border,
   },
-  heroIconContainer: {
-    width: 120, height: 120, borderRadius: 32, alignItems: 'center', justifyContent: 'center', marginBottom: 16,
+  heroGif: {
+    width: '100%', height: 200, marginBottom: 12,
   },
   heroMeta: { flexDirection: 'row', gap: 10 },
   heroBadge: {

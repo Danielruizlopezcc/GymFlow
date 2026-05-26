@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
-  TextInput, ScrollView, ActivityIndicator, StatusBar
+  TextInput, ScrollView, ActivityIndicator, StatusBar, Image
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -67,6 +67,7 @@ export default function ExercisesScreen() {
 
   const renderExerciseCard = ({ item }: { item: Exercise }) => {
     const color = BODY_PART_COLORS[item.body_part] || COLORS.accent;
+    const gifUrl = `${BACKEND_URL}/api/exercises/${item.exercise_id}/gif`;
     return (
       <TouchableOpacity
         testID={`exercise-card-${item.exercise_id}`}
@@ -74,13 +75,11 @@ export default function ExercisesScreen() {
         onPress={() => router.push(`/exercise/${item.exercise_id}`)}
         activeOpacity={0.7}
       >
-        <View style={[styles.exerciseIconContainer, { backgroundColor: color + '15' }]}>
-          <Ionicons
-            name={(BODY_PART_ICONS[item.body_part] || 'barbell-outline') as any}
-            size={28}
-            color={color}
-          />
-        </View>
+        <Image
+          source={{ uri: gifUrl }}
+          style={styles.exerciseGif}
+          defaultSource={undefined}
+        />
         <View style={styles.exerciseInfo}>
           <Text style={styles.exerciseName} numberOfLines={1}>{item.name}</Text>
           <View style={styles.exerciseMeta}>
@@ -270,18 +269,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: COLORS.cardBg,
     borderRadius: 16,
-    padding: 16,
+    padding: 12,
     marginBottom: 10,
     borderWidth: 1,
     borderColor: COLORS.border,
-    gap: 14,
+    gap: 12,
   },
-  exerciseIconContainer: {
-    width: 52,
-    height: 52,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
+  exerciseGif: {
+    width: 60,
+    height: 60,
+    borderRadius: 12,
+    backgroundColor: COLORS.surface,
   },
   exerciseInfo: {
     flex: 1,

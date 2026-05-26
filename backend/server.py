@@ -1,11 +1,13 @@
 from fastapi import FastAPI, APIRouter, Header
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
 import httpx
+import asyncio
+import re
 from pathlib import Path
 from pydantic import BaseModel, Field
 from typing import List, Optional
@@ -15,9 +17,13 @@ from datetime import datetime, timezone, timedelta
 from exercises_data import EXERCISES
 
 ROOT_DIR = Path(__file__).parent
+GIF_CACHE_DIR = ROOT_DIR / "gif_cache"
+GIF_CACHE_DIR.mkdir(exist_ok=True)
+
 load_dotenv(ROOT_DIR / '.env')
 
 mongo_url = os.environ['MONGO_URL']
+RAPIDAPI_KEY = os.environ.get('RAPIDAPI_KEY', '')
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ.get('DB_NAME', 'gym_app')]
 
@@ -292,6 +298,45 @@ async def delete_workout(workout_id: str, authorization: Optional[str] = Header(
         return JSONResponse(status_code=404, content={"error": "Workout not found"})
     return {"message": "Workout deleted"}
 
+# GIF proxy endpoint with disk caching
+@api_router.get("/exercises/{exercise_id}/gif")
+async def get_exercise_gif(exercise_id: str):
+    # Check disk cache first
+    cache_path = GIF_CACHE_DIR / f"{exercise_id}.gif"
+    if cache_path.exists():
+        gif_data = cache_path.read_bytes()
+        return Response(content=gif_data, media_type="image/gif",
+                       headers={"Cache-Control": "public, max-age=31536000"})
+
+    if not RAPIDAPI_KEY:
+        return JSONResponse(status_code=404, content={"error": "No API key configured"})
+
+    # Get rapidapi_id from DB
+    exercise = await db.exercises.find_one({"exercise_id": exercise_id}, {"_id": 0})
+    if not exercise:
+        return JSONResponse(status_code=404, content={"error": "Exercise not found"})
+
+    rapidapi_id = exercise.get("rapidapi_id", "")
+    if not rapidapi_id:
+        return JSONResponse(status_code=404, content={"error": "No GIF mapping available"})
+
+    # Fetch from RapidAPI
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as http_client:
+            resp = await http_client.get(
+                f"https://exercisedb.p.rapidapi.com/image?exerciseId={rapidapi_id}&resolution=180",
+                headers=RAPIDAPI_HEADERS
+            )
+            if resp.status_code == 200 and len(resp.content) > 100:
+                cache_path.write_bytes(resp.content)
+                return Response(content=resp.content, media_type="image/gif",
+                               headers={"Cache-Control": "public, max-age=31536000"})
+            else:
+                return JSONResponse(status_code=404, content={"error": "GIF not found"})
+    except Exception as e:
+        logger.error(f"GIF fetch error: {e}")
+        return JSONResponse(status_code=500, content={"error": "Failed to fetch GIF"})
+
 # ─── Health ───
 @api_router.get("/health")
 async def health():
@@ -307,6 +352,93 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+import asyncio
+import re
+
+def normalize_name(name: str) -> str:
+    """Normalize exercise name for matching."""
+    return re.sub(r'[^a-z0-9\s]', '', name.lower().strip())
+
+def name_similarity(name1: str, name2: str) -> float:
+    """Calculate word-based similarity between two names."""
+    words1 = set(normalize_name(name1).split())
+    words2 = set(normalize_name(name2).split())
+    if not words1 or not words2:
+        return 0.0
+    common = words1 & words2
+    return len(common) / max(len(words1), len(words2))
+
+RAPIDAPI_HEADERS = {
+    "x-rapidapi-key": RAPIDAPI_KEY,
+    "x-rapidapi-host": "exercisedb.p.rapidapi.com"
+}
+
+async def fetch_and_map_rapidapi_ids():
+    """Fetch exercises from RapidAPI by name search, match and store rapidapi_id."""
+    if not RAPIDAPI_KEY:
+        logger.info("No RAPIDAPI_KEY set, skipping ExerciseDB GIF mapping.")
+        return
+
+    already_mapped = await db.exercises.count_documents({"rapidapi_id": {"$exists": True, "$ne": ""}})
+    if already_mapped > 40:
+        logger.info(f"RapidAPI IDs already mapped for {already_mapped} exercises.")
+        return
+
+    logger.info("Mapping exercises to RapidAPI IDs via name search...")
+    our_exercises = await db.exercises.find(
+        {"$or": [{"rapidapi_id": {"$exists": False}}, {"rapidapi_id": ""}]},
+        {"_id": 0, "exercise_id": 1, "name": 1}
+    ).to_list(200)
+
+    if not our_exercises:
+        logger.info("All exercises already have RapidAPI IDs.")
+        return
+
+    matched = 0
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as http_client:
+            for i, our_ex in enumerate(our_exercises):
+                search_term = our_ex["name"].lower().replace("-", " ")
+                # Use key words for search (first 2-3 significant words)
+                words = search_term.split()
+                search_q = " ".join(words[:3]) if len(words) > 3 else search_term
+
+                try:
+                    resp = await http_client.get(
+                        f"https://exercisedb.p.rapidapi.com/exercises/name/{search_q}?limit=5",
+                        headers=RAPIDAPI_HEADERS
+                    )
+                    if resp.status_code == 200:
+                        results = resp.json()
+                        if results:
+                            # Find best match
+                            best_match = None
+                            best_score = 0.0
+                            for r in results:
+                                score = name_similarity(our_ex["name"], r.get("name", ""))
+                                if score > best_score:
+                                    best_score = score
+                                    best_match = r
+                            if best_match and best_score >= 0.5:
+                                await db.exercises.update_one(
+                                    {"exercise_id": our_ex["exercise_id"]},
+                                    {"$set": {"rapidapi_id": best_match["id"]}}
+                                )
+                                matched += 1
+                                logger.debug(f"Mapped '{our_ex['name']}' -> '{best_match['name']}' (id={best_match['id']}, score={best_score:.2f})")
+                except Exception as e:
+                    logger.warning(f"Search failed for '{our_ex['name']}': {e}")
+
+                # Rate limit: ~2 req/sec to stay safe
+                if (i + 1) % 10 == 0:
+                    logger.info(f"Mapping progress: {i+1}/{len(our_exercises)} ({matched} matched)")
+                await asyncio.sleep(0.6)
+
+    except Exception as e:
+        logger.error(f"RapidAPI mapping error: {e}")
+
+    logger.info(f"Mapped {matched}/{len(our_exercises)} exercises to RapidAPI IDs")
 
 @app.on_event("startup")
 async def startup():
@@ -337,6 +469,9 @@ async def startup():
         logger.info("Exercise seeding complete.")
     else:
         logger.info(f"Exercises already seeded: {count} exercises in DB.")
+
+    # Fetch and map RapidAPI IDs for GIFs
+    await fetch_and_map_rapidapi_ids()
 
 @app.on_event("shutdown")
 async def shutdown():
