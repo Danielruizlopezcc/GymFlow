@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  ActivityIndicator, StatusBar, Alert
+  ActivityIndicator, StatusBar, Alert, Image
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,8 +10,8 @@ import { storage } from '@/src/utils/storage';
 import { COLORS } from '@/src/constants/theme';
 
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL;
-const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const DAYS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+const MONTHS = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 
 interface Workout {
   workout_id: string;
@@ -76,9 +76,9 @@ export default function CalendarScreen() {
   };
 
   const confirmDelete = (workoutId: string) => {
-    Alert.alert('Delete Workout', 'Are you sure you want to delete this workout?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => deleteWorkout(workoutId) },
+    Alert.alert('Eliminar Entrenamiento', '¿Estás seguro de que quieres eliminar este entrenamiento?', [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Eliminar', style: 'destructive', onPress: () => deleteWorkout(workoutId) },
     ]);
   };
 
@@ -105,7 +105,7 @@ export default function CalendarScreen() {
       <StatusBar barStyle="dark-content" />
 
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>PLANNER</Text>
+        <Text style={styles.headerTitle}>PLANIFICADOR</Text>
         <TouchableOpacity
           testID="create-workout-btn"
           style={styles.addBtn}
@@ -175,7 +175,7 @@ export default function CalendarScreen() {
         <View style={styles.selectedDaySection}>
           <View style={styles.selectedDayHeader}>
             <Text style={styles.selectedDayTitle}>
-              {selectedDate === today ? 'Today' : new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
+              {selectedDate === today ? 'Hoy' : new Date(selectedDate + 'T12:00:00').toLocaleDateString('es-ES', { weekday: 'long', month: 'short', day: 'numeric' })}
             </Text>
           </View>
 
@@ -198,26 +198,30 @@ export default function CalendarScreen() {
                 </View>
                 {w.exercises.map((ex, i) => (
                   <View key={i} style={styles.workoutExerciseRow}>
-                    <Text style={styles.workoutExerciseName}>{ex.name}</Text>
-                    <Text style={styles.workoutExerciseSets}>{ex.sets}x{ex.reps}</Text>
+                    <Image
+                      source={{ uri: `${BACKEND_URL}/api/exercises/${ex.exercise_id}/gif` }}
+                      style={styles.workoutExerciseGif}
+                    />
+                    <Text style={styles.workoutExerciseName} numberOfLines={1}>{ex.name}</Text>
+                    <Text style={styles.workoutExerciseSets}>{ex.sets}×{ex.reps}</Text>
                   </View>
                 ))}
                 {w.exercises.length === 0 && (
-                  <Text style={styles.noExercisesText}>No exercises added yet</Text>
+                  <Text style={styles.noExercisesText}>Aún no hay ejercicios añadidos</Text>
                 )}
               </View>
             ))
           ) : (
             <View style={styles.emptyDay}>
               <Ionicons name="calendar-outline" size={40} color={COLORS.border} />
-              <Text style={styles.emptyDayText}>No workouts planned</Text>
+              <Text style={styles.emptyDayText}>Sin entrenamientos planificados</Text>
               <TouchableOpacity
                 testID="add-workout-empty-btn"
                 style={styles.addWorkoutBtn}
                 onPress={() => router.push({ pathname: '/workout/create', params: { date: selectedDate } })}
               >
                 <Ionicons name="add" size={18} color={COLORS.white} />
-                <Text style={styles.addWorkoutBtnText}>Add Workout</Text>
+                <Text style={styles.addWorkoutBtnText}>Añadir Entrenamiento</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -287,11 +291,14 @@ const styles = StyleSheet.create({
   workoutDotLarge: { width: 10, height: 10, borderRadius: 5 },
   workoutName: { fontSize: 17, fontWeight: '700', color: COLORS.text },
   workoutExerciseRow: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingVertical: 6, borderTopWidth: 1, borderTopColor: COLORS.surface,
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingVertical: 8, borderTopWidth: 1, borderTopColor: COLORS.surface,
   },
-  workoutExerciseName: { fontSize: 14, color: COLORS.text, flex: 1 },
-  workoutExerciseSets: { fontSize: 14, fontWeight: '600', color: COLORS.textSecondary },
+  workoutExerciseGif: {
+    width: 40, height: 40, borderRadius: 10, backgroundColor: COLORS.surface,
+  },
+  workoutExerciseName: { fontSize: 14, color: COLORS.text, flex: 1, fontWeight: '500' },
+  workoutExerciseSets: { fontSize: 13, fontWeight: '700', color: COLORS.accent },
   noExercisesText: { fontSize: 14, color: COLORS.textSecondary, fontStyle: 'italic' },
   emptyDay: { alignItems: 'center', paddingTop: 40, gap: 12 },
   emptyDayText: { fontSize: 16, color: COLORS.textSecondary },

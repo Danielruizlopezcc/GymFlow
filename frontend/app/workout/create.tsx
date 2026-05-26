@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, TextInput, FlatList,
-  ScrollView, StatusBar, ActivityIndicator, KeyboardAvoidingView, Platform, Alert
+  ScrollView, StatusBar, ActivityIndicator, KeyboardAvoidingView, Platform, Alert, Image
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { storage } from '@/src/utils/storage';
-import { COLORS, BODY_PART_COLORS, BODY_PART_ICONS } from '@/src/constants/theme';
+import { COLORS, BODY_PART_COLORS, BODY_PART_ICONS, BODY_PART_ES, EQUIPMENT_ES } from '@/src/constants/theme';
 
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL;
 
@@ -85,7 +85,7 @@ export default function CreateWorkoutScreen() {
 
   const saveWorkout = async () => {
     if (!workoutName.trim()) {
-      Alert.alert('Error', 'Please enter a workout name');
+      Alert.alert('Error', 'Por favor introduce un nombre para el entrenamiento');
       return;
     }
     setSaving(true);
@@ -107,7 +107,7 @@ export default function CreateWorkoutScreen() {
         router.back();
       } else {
         const err = await resp.json();
-        Alert.alert('Error', err.error || 'Failed to save workout');
+        Alert.alert('Error', err.error || 'Error al guardar el entrenamiento');
       }
     } catch (e) {
       Alert.alert('Error', 'Failed to save workout');
@@ -117,8 +117,8 @@ export default function CreateWorkoutScreen() {
   };
 
   const formattedDate = date
-    ? new Date(date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })
-    : 'Today';
+    ? new Date(date + 'T12:00:00').toLocaleDateString('es-ES', { weekday: 'long', month: 'short', day: 'numeric' })
+    : 'Hoy';
 
   if (showExercisePicker) {
     return (
@@ -128,7 +128,7 @@ export default function CreateWorkoutScreen() {
           <TouchableOpacity testID="close-picker-btn" onPress={() => { setShowExercisePicker(false); setSearchQuery(''); }}>
             <Ionicons name="arrow-back" size={24} color={COLORS.text} />
           </TouchableOpacity>
-          <Text style={styles.pickerTitle}>Add Exercise</Text>
+          <Text style={styles.pickerTitle}>Añadir Ejercicio</Text>
           <View style={{ width: 24 }} />
         </View>
         <View style={styles.pickerSearch}>
@@ -136,7 +136,7 @@ export default function CreateWorkoutScreen() {
           <TextInput
             testID="picker-search-input"
             style={styles.pickerSearchInput}
-            placeholder="Search exercises..."
+            placeholder="Buscar ejercicios..."
             placeholderTextColor={COLORS.textSecondary}
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -150,6 +150,7 @@ export default function CreateWorkoutScreen() {
           renderItem={({ item }) => {
             const isAdded = selectedExercises.some(e => e.exercise_id === item.exercise_id);
             const color = BODY_PART_COLORS[item.body_part] || COLORS.accent;
+            const gifUrl = `${BACKEND_URL}/api/exercises/${item.exercise_id}/gif`;
             return (
               <TouchableOpacity
                 testID={`pick-exercise-${item.exercise_id}`}
@@ -157,12 +158,15 @@ export default function CreateWorkoutScreen() {
                 onPress={() => addExercise(item)}
                 disabled={isAdded}
               >
-                <View style={[styles.pickerItemIcon, { backgroundColor: color + '15' }]}>
-                  <Ionicons name={(BODY_PART_ICONS[item.body_part] || 'barbell-outline') as any} size={22} color={color} />
-                </View>
+                <Image source={{ uri: gifUrl }} style={styles.pickerItemGif} />
                 <View style={styles.pickerItemInfo}>
-                  <Text style={styles.pickerItemName}>{item.name}</Text>
-                  <Text style={styles.pickerItemMeta}>{item.body_part} · {item.equipment}</Text>
+                  <Text style={styles.pickerItemName} numberOfLines={1}>{item.name}</Text>
+                  <View style={styles.pickerItemMetaRow}>
+                    <View style={[styles.pickerItemBadge, { backgroundColor: color + '15' }]}>
+                      <Text style={[styles.pickerItemBadgeText, { color }]}>{BODY_PART_ES[item.body_part] || item.body_part}</Text>
+                    </View>
+                    <Text style={styles.pickerItemMeta}>{EQUIPMENT_ES[item.equipment] || item.equipment}</Text>
+                  </View>
                 </View>
                 {isAdded ? (
                   <Ionicons name="checkmark-circle" size={24} color={COLORS.success} />
@@ -190,7 +194,7 @@ export default function CreateWorkoutScreen() {
           <TouchableOpacity testID="close-create-btn" onPress={() => router.back()}>
             <Ionicons name="close" size={24} color={COLORS.text} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>New Workout</Text>
+          <Text style={styles.headerTitle}>Nuevo Entrenamiento</Text>
           <TouchableOpacity
             testID="save-workout-btn"
             onPress={saveWorkout}
@@ -199,7 +203,7 @@ export default function CreateWorkoutScreen() {
             {saving ? (
               <ActivityIndicator size="small" color={COLORS.accent} />
             ) : (
-              <Text style={[styles.saveText, !workoutName.trim() && { opacity: 0.4 }]}>Save</Text>
+              <Text style={styles.saveText}>Guardar</Text>
             )}
           </TouchableOpacity>
         </View>
@@ -212,7 +216,7 @@ export default function CreateWorkoutScreen() {
           <TextInput
             testID="workout-name-input"
             style={styles.nameInput}
-            placeholder="Workout name (e.g. Push Day)"
+            placeholder="Nombre (ej: Día de Pecho)"
             placeholderTextColor={COLORS.textSecondary}
             value={workoutName}
             onChangeText={setWorkoutName}
@@ -220,11 +224,15 @@ export default function CreateWorkoutScreen() {
 
           {/* Exercise List */}
           <View style={styles.exercisesSection}>
-            <Text style={styles.sectionTitle}>EXERCISES</Text>
+            <Text style={styles.sectionTitle}>EJERCICIOS</Text>
             {selectedExercises.map((ex, idx) => (
               <View key={ex.exercise_id} style={styles.exerciseRow} testID={`workout-exercise-${idx}`}>
                 <View style={styles.exerciseRowHeader}>
-                  <Text style={styles.exerciseRowName}>{ex.name}</Text>
+                  <Image
+                    source={{ uri: `${BACKEND_URL}/api/exercises/${ex.exercise_id}/gif` }}
+                    style={styles.exerciseRowGif}
+                  />
+                  <Text style={styles.exerciseRowName} numberOfLines={2}>{ex.name}</Text>
                   <TouchableOpacity
                     testID={`remove-exercise-${idx}`}
                     onPress={() => removeExercise(ex.exercise_id)}
@@ -284,7 +292,7 @@ export default function CreateWorkoutScreen() {
               onPress={() => setShowExercisePicker(true)}
             >
               <Ionicons name="add-circle" size={22} color={COLORS.accent} />
-              <Text style={styles.addExerciseBtnText}>Add Exercise</Text>
+              <Text style={styles.addExerciseBtnText}>Añadir Ejercicio</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -318,9 +326,12 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.surface, borderRadius: 14, padding: 16, marginBottom: 12,
   },
   exerciseRowHeader: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12,
+    flexDirection: 'row', alignItems: 'center', marginBottom: 12, gap: 12,
   },
-  exerciseRowName: { fontSize: 16, fontWeight: '700', color: COLORS.text, flex: 1, marginRight: 8 },
+  exerciseRowGif: {
+    width: 44, height: 44, borderRadius: 10, backgroundColor: COLORS.background,
+  },
+  exerciseRowName: { fontSize: 15, fontWeight: '700', color: COLORS.text, flex: 1 },
   exerciseRowConfig: { flexDirection: 'row', gap: 12 },
   configItem: { flex: 1, alignItems: 'center', gap: 6 },
   configLabel: { fontSize: 11, fontWeight: '600', color: COLORS.textSecondary, textTransform: 'uppercase' },
@@ -359,10 +370,16 @@ const styles = StyleSheet.create({
     paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: COLORS.surface,
   },
   pickerItemAdded: { opacity: 0.5 },
+  pickerItemGif: {
+    width: 52, height: 52, borderRadius: 12, backgroundColor: COLORS.surface,
+  },
   pickerItemIcon: {
     width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center',
   },
   pickerItemInfo: { flex: 1 },
-  pickerItemName: { fontSize: 15, fontWeight: '600', color: COLORS.text },
-  pickerItemMeta: { fontSize: 12, color: COLORS.textSecondary, marginTop: 2, textTransform: 'capitalize' },
+  pickerItemName: { fontSize: 15, fontWeight: '700', color: COLORS.text },
+  pickerItemMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
+  pickerItemBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
+  pickerItemBadgeText: { fontSize: 11, fontWeight: '700', textTransform: 'capitalize' },
+  pickerItemMeta: { fontSize: 12, color: COLORS.textSecondary, textTransform: 'capitalize' },
 });

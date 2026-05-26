@@ -16,7 +16,7 @@ export default function ProfileScreen() {
       <StatusBar barStyle="dark-content" />
 
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>PROFILE</Text>
+        <Text style={styles.headerTitle}>PERFIL</Text>
       </View>
 
       <View style={styles.content}>
@@ -29,7 +29,7 @@ export default function ProfileScreen() {
               <Ionicons name="person" size={32} color={COLORS.textSecondary} />
             </View>
           )}
-          <Text style={styles.userName}>{user?.name || 'User'}</Text>
+          <Text style={styles.userName}>{user?.name || 'Usuario'}</Text>
           <Text style={styles.userEmail}>{user?.email}</Text>
         </View>
 
@@ -37,10 +37,10 @@ export default function ProfileScreen() {
         <View style={styles.menuSection}>
           <View style={styles.menuCard}>
             {[
-              { icon: 'fitness-outline', label: 'My Workouts', color: COLORS.accent },
-              { icon: 'trophy-outline', label: 'Achievements', color: COLORS.warning },
-              { icon: 'stats-chart-outline', label: 'Statistics', color: COLORS.success },
-              { icon: 'settings-outline', label: 'Settings', color: COLORS.textSecondary },
+              { icon: 'fitness-outline', label: 'Mis Entrenamientos', color: COLORS.accent },
+              { icon: 'trophy-outline', label: 'Logros', color: COLORS.warning },
+              { icon: 'stats-chart-outline', label: 'Estadísticas', color: COLORS.success },
+              { icon: 'settings-outline', label: 'Ajustes', color: COLORS.textSecondary },
             ].map((item, idx) => (
               <TouchableOpacity
                 key={idx}
@@ -65,7 +65,7 @@ export default function ProfileScreen() {
           activeOpacity={0.8}
         >
           <Ionicons name="log-out-outline" size={20} color={COLORS.danger} />
-          <Text style={styles.logoutText}>Log Out</Text>
+          <Text style={styles.logoutText}>Cerrar Sesión</Text>
         </TouchableOpacity>
 
         <Text style={styles.version}>GymFlow v1.0.0</Text>

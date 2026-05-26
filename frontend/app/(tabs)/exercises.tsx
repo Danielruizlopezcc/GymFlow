@@ -6,7 +6,7 @@ import {
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { COLORS, BODY_PART_COLORS, BODY_PART_ICONS } from '@/src/constants/theme';
+import { COLORS, BODY_PART_COLORS, BODY_PART_ICONS, BODY_PART_ES, EQUIPMENT_ES } from '@/src/constants/theme';
 
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL;
 
@@ -78,16 +78,15 @@ export default function ExercisesScreen() {
         <Image
           source={{ uri: gifUrl }}
           style={styles.exerciseGif}
-          defaultSource={undefined}
         />
         <View style={styles.exerciseInfo}>
           <Text style={styles.exerciseName} numberOfLines={1}>{item.name}</Text>
           <View style={styles.exerciseMeta}>
             <View style={[styles.metaBadge, { backgroundColor: color + '15' }]}>
-              <Text style={[styles.metaBadgeText, { color }]}>{item.body_part}</Text>
+              <Text style={[styles.metaBadgeText, { color }]}>{BODY_PART_ES[item.body_part] || item.body_part}</Text>
             </View>
             <View style={styles.metaBadge}>
-              <Text style={styles.metaBadgeText}>{item.equipment}</Text>
+              <Text style={styles.metaBadgeText}>{EQUIPMENT_ES[item.equipment] || item.equipment}</Text>
             </View>
           </View>
           <Text style={styles.exerciseMuscles} numberOfLines={1}>
@@ -103,20 +102,18 @@ export default function ExercisesScreen() {
     <View style={[styles.container, { paddingTop: insets.top }]} testID="exercises-screen">
       <StatusBar barStyle="dark-content" />
 
-      {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>EXERCISES</Text>
-        <Text style={styles.headerSubtitle}>{exercises.length} exercises available</Text>
+        <Text style={styles.headerTitle}>EJERCICIOS</Text>
+        <Text style={styles.headerSubtitle}>{exercises.length} ejercicios disponibles</Text>
       </View>
 
-      {/* Search */}
       <View style={styles.searchContainer}>
         <View style={styles.searchBar}>
           <Ionicons name="search" size={20} color={COLORS.textSecondary} />
           <TextInput
             testID="exercise-search-input"
             style={styles.searchInput}
-            placeholder="Search exercises..."
+            placeholder="Buscar ejercicios..."
             placeholderTextColor={COLORS.textSecondary}
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -129,7 +126,6 @@ export default function ExercisesScreen() {
         </View>
       </View>
 
-      {/* Body Part Filter Pills */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -140,7 +136,7 @@ export default function ExercisesScreen() {
           style={[styles.filterPill, !selectedBodyPart && styles.filterPillActive]}
           onPress={() => setSelectedBodyPart('')}
         >
-          <Text style={[styles.filterText, !selectedBodyPart && styles.filterTextActive]}>All</Text>
+          <Text style={[styles.filterText, !selectedBodyPart && styles.filterTextActive]}>Todos</Text>
         </TouchableOpacity>
         {bodyParts.map((bp) => {
           const isActive = selectedBodyPart === bp;
@@ -156,14 +152,13 @@ export default function ExercisesScreen() {
               onPress={() => setSelectedBodyPart(isActive ? '' : bp)}
             >
               <Text style={[styles.filterText, isActive && styles.filterTextActive]}>
-                {bp.charAt(0).toUpperCase() + bp.slice(1)}
+                {BODY_PART_ES[bp] || bp}
               </Text>
             </TouchableOpacity>
           );
         })}
       </ScrollView>
 
-      {/* Exercise List */}
       {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={COLORS.accent} />
@@ -178,8 +173,8 @@ export default function ExercisesScreen() {
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Ionicons name="search-outline" size={48} color={COLORS.textSecondary} />
-              <Text style={styles.emptyText}>No exercises found</Text>
-              <Text style={styles.emptySubtext}>Try a different search or filter</Text>
+              <Text style={styles.emptyText}>No se encontraron ejercicios</Text>
+              <Text style={styles.emptySubtext}>Prueba con otro filtro o búsqueda</Text>
             </View>
           }
         />

@@ -6,7 +6,7 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { COLORS, BODY_PART_COLORS, BODY_PART_ICONS, EQUIPMENT_ICONS } from '@/src/constants/theme';
+import { COLORS, BODY_PART_COLORS, BODY_PART_ICONS, EQUIPMENT_ICONS, BODY_PART_ES, EQUIPMENT_ES } from '@/src/constants/theme';
 
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL;
 
@@ -74,9 +74,9 @@ export default function ExerciseDetailScreen() {
   if (!exercise) {
     return (
       <View style={[styles.loadingContainer, { paddingTop: insets.top }]}>
-        <Text style={styles.errorText}>Exercise not found</Text>
+        <Text style={styles.errorText}>Ejercicio no encontrado</Text>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtnAlt}>
-          <Text style={styles.backBtnAltText}>Go Back</Text>
+          <Text style={styles.backBtnAltText}>Volver</Text>
         </TouchableOpacity>
       </View>
     );
@@ -107,12 +107,12 @@ export default function ExerciseDetailScreen() {
         <View style={styles.heroMeta}>
           <View style={[styles.heroBadge, { backgroundColor: bodyColor + '20' }]}>
             <Text style={[styles.heroBadgeText, { color: bodyColor }]}>
-              {exercise.body_part}
+              {BODY_PART_ES[exercise.body_part] || exercise.body_part}
             </Text>
           </View>
           <View style={styles.heroBadge}>
             <Ionicons name={(EQUIPMENT_ICONS[exercise.equipment] || 'ellipsis-horizontal-outline') as any} size={14} color={COLORS.textSecondary} />
-            <Text style={styles.heroBadgeText}>{exercise.equipment}</Text>
+            <Text style={styles.heroBadgeText}>{EQUIPMENT_ES[exercise.equipment] || exercise.equipment}</Text>
           </View>
         </View>
       </View>
@@ -127,7 +127,7 @@ export default function ExerciseDetailScreen() {
             onPress={() => setActiveTab(tab)}
           >
             <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
-              {tab === 'about' ? 'About' : tab === 'instructions' ? 'Instructions' : `Alternatives (${similar.length})`}
+              {tab === 'about' ? 'Info' : tab === 'instructions' ? 'Instrucciones' : `Alternativas (${similar.length})`}
             </Text>
           </TouchableOpacity>
         ))}
@@ -141,7 +141,7 @@ export default function ExerciseDetailScreen() {
               <View style={styles.muscleSection}>
                 <View style={styles.muscleLabelRow}>
                   <View style={[styles.muscleDot, { backgroundColor: '#EF4444' }]} />
-                  <Text style={styles.muscleLabel}>PRIMARY</Text>
+                  <Text style={styles.muscleLabel}>PRIMARIO</Text>
                 </View>
                 {exercise.primary_muscles.map((m, i) => (
                   <Text key={i} style={styles.muscleName}>{m}</Text>
@@ -151,7 +151,7 @@ export default function ExerciseDetailScreen() {
                 <View style={[styles.muscleSection, styles.muscleSectionBorder]}>
                   <View style={styles.muscleLabelRow}>
                     <View style={[styles.muscleDot, { backgroundColor: '#3B82F6' }]} />
-                    <Text style={styles.muscleLabel}>SECONDARY</Text>
+                    <Text style={styles.muscleLabel}>SECUNDARIO</Text>
                   </View>
                   {exercise.secondary_muscles.map((m, i) => (
                     <Text key={i} style={styles.muscleName}>{m}</Text>
@@ -164,18 +164,18 @@ export default function ExerciseDetailScreen() {
             <View style={styles.infoRow}>
               <View style={styles.infoItem}>
                 <Ionicons name="body-outline" size={24} color={COLORS.accent} />
-                <Text style={styles.infoLabel}>Body Part</Text>
-                <Text style={styles.infoValue}>{exercise.body_part}</Text>
+                <Text style={styles.infoLabel}>Grupo</Text>
+                <Text style={styles.infoValue}>{BODY_PART_ES[exercise.body_part] || exercise.body_part}</Text>
               </View>
               <View style={styles.infoItem}>
                 <Ionicons name="locate-outline" size={24} color={COLORS.accent} />
-                <Text style={styles.infoLabel}>Target</Text>
+                <Text style={styles.infoLabel}>Músculo</Text>
                 <Text style={styles.infoValue}>{exercise.target}</Text>
               </View>
               <View style={styles.infoItem}>
                 <Ionicons name={(EQUIPMENT_ICONS[exercise.equipment] || 'barbell-outline') as any} size={24} color={COLORS.accent} />
-                <Text style={styles.infoLabel}>Equipment</Text>
-                <Text style={styles.infoValue}>{exercise.equipment}</Text>
+                <Text style={styles.infoLabel}>Equipo</Text>
+                <Text style={styles.infoValue}>{EQUIPMENT_ES[exercise.equipment] || exercise.equipment}</Text>
               </View>
             </View>
           </View>
@@ -196,9 +196,9 @@ export default function ExerciseDetailScreen() {
 
         {activeTab === 'similar' && (
           <View>
-            <Text style={styles.similarTitle}>Alternative exercises</Text>
+            <Text style={styles.similarTitle}>Ejercicios alternativos</Text>
             <Text style={styles.similarSubtitle}>
-              Machine busy? Try these alternatives that target the same muscles
+              ¿Máquina ocupada? Prueba estas alternativas que trabajan los mismos músculos
             </Text>
             {similar.length > 0 ? (
               similar.map((item) => {
@@ -210,18 +210,15 @@ export default function ExerciseDetailScreen() {
                     style={styles.similarCard}
                     onPress={() => navigateToExercise(item.exercise_id)}
                   >
-                    <View style={[styles.similarIcon, { backgroundColor: simColor + '15' }]}>
-                      <Ionicons
-                        name={(BODY_PART_ICONS[item.body_part] || 'barbell-outline') as any}
-                        size={24}
-                        color={simColor}
-                      />
-                    </View>
+                    <Image
+                      source={{ uri: `${BACKEND_URL}/api/exercises/${item.exercise_id}/gif` }}
+                      style={styles.similarGif}
+                    />
                     <View style={styles.similarInfo}>
                       <Text style={styles.similarName}>{item.name}</Text>
                       <View style={styles.similarMeta}>
                         <View style={[styles.similarBadge, { backgroundColor: simColor + '15' }]}>
-                          <Text style={[styles.similarBadgeText, { color: simColor }]}>{item.equipment}</Text>
+                          <Text style={[styles.similarBadgeText, { color: simColor }]}>{EQUIPMENT_ES[item.equipment] || item.equipment}</Text>
                         </View>
                         <Text style={styles.similarTarget}>{item.target}</Text>
                       </View>
@@ -233,7 +230,7 @@ export default function ExerciseDetailScreen() {
             ) : (
               <View style={styles.noSimilar}>
                 <Ionicons name="search-outline" size={40} color={COLORS.textSecondary} />
-                <Text style={styles.noSimilarText}>No alternatives found</Text>
+                <Text style={styles.noSimilarText}>No se encontraron alternativas</Text>
               </View>
             )}
           </View>
@@ -312,8 +309,8 @@ const styles = StyleSheet.create({
     borderRadius: 14, padding: 14, marginBottom: 10,
     borderWidth: 1, borderColor: COLORS.border, gap: 12,
   },
-  similarIcon: {
-    width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center',
+  similarGif: {
+    width: 48, height: 48, borderRadius: 12, backgroundColor: COLORS.surface,
   },
   similarInfo: { flex: 1 },
   similarName: { fontSize: 15, fontWeight: '700', color: COLORS.text },

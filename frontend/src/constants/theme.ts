@@ -27,6 +27,29 @@ export const COLORS = {
   cardio: '#EF4444',
 };
 
+export const BODY_PART_ES: Record<string, string> = {
+  'chest': 'Pecho',
+  'back': 'Espalda',
+  'shoulders': 'Hombros',
+  'upper arms': 'Brazos',
+  'lower arms': 'Antebrazos',
+  'upper legs': 'Piernas',
+  'lower legs': 'Gemelos',
+  'waist': 'Core / Abdomen',
+  'cardio': 'Cardio',
+  'neck': 'Cuello',
+};
+
+export const EQUIPMENT_ES: Record<string, string> = {
+  'barbell': 'Barra',
+  'dumbbell': 'Mancuerna',
+  'machine': 'Máquina',
+  'cable': 'Polea',
+  'bodyweight': 'Peso corporal',
+  'band': 'Banda',
+  'other': 'Otro',
+};
+
 export const BODY_PART_COLORS: Record<string, string> = {
   'chest': '#EF4444',
   'back': '#3B82F6',
