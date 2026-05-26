@@ -4,7 +4,7 @@
   publish = "dist"
 
 [build.environment]
-  NODE_VERSION = "20"
+  NODE_VERSION = "22"
 
 # Rutas dinámicas (ej: /exercise/bench-press) → deja que Expo Router las maneje
 [[redirects]]
