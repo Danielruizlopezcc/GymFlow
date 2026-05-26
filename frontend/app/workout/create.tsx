@@ -34,6 +34,7 @@ export default function CreateWorkoutScreen() {
   const [debouncedSearch, setDebouncedSearch]           = useState('');
   const [saving, setSaving]                             = useState(false);
   const [loadingWorkout, setLoadingWorkout]             = useState(isEditMode);
+  const [errors, setErrors]                             = useState<{ name?: string; exercises?: string; save?: string }>({});
 
   const router  = useRouter();
   const insets  = useSafeAreaInsets();
@@ -85,6 +86,7 @@ export default function CreateWorkoutScreen() {
     setShowPicker(false);
     setPickerSearch('');
     setPickerBodyPart(null);
+    setErrors(e => ({ ...e, exercises: undefined }));
   };
 
   const removeExercise = (id: string) =>
@@ -96,26 +98,32 @@ export default function CreateWorkoutScreen() {
     );
 
   const handleSave = async () => {
-    if (!workoutName.trim()) {
-      Alert.alert('Falta el nombre', 'Ponle un nombre al entrenamiento');
+    // Nombre automático si está vacío
+    const finalName = workoutName.trim() ||
+      new Date((date || new Date().toISOString().split('T')[0]) + 'T12:00:00')
+        .toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'short' });
+
+    // Validación inline — sin ejercicios no guardamos
+    if (selectedExercises.length === 0) {
+      setErrors(e => ({ ...e, exercises: 'Añade al menos un ejercicio antes de guardar' }));
       return;
     }
+    setErrors({});
     setSaving(true);
     try {
       if (isEditMode && workoutId) {
-        await updateWorkout(workoutId, { name: workoutName.trim(), exercises: selectedExercises });
+        await updateWorkout(workoutId, { name: finalName, exercises: selectedExercises });
       } else {
         await createWorkout({
           date:      date || new Date().toISOString().split('T')[0],
-          name:      workoutName.trim(),
+          name:      finalName,
           exercises: selectedExercises,
         });
       }
       router.back();
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Error desconocido';
-      Alert.alert('Error', `No se pudo guardar: ${msg}`);
-    } finally {
+      setErrors(prev => ({ ...prev, save: `No se pudo guardar: ${msg}` }));
       setSaving(false);
     }
   };
@@ -176,11 +184,13 @@ export default function CreateWorkoutScreen() {
           ) : null}
         </View>
 
-        {/* Filtro por grupo muscular */}
+        {/* Filtro por grupo muscular — altura fija para no expandirse */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
+          style={styles.pickerTabsScroll}
           contentContainerStyle={styles.pickerTabs}
+          bounces={false}
         >
           {PICKER_TABS.map(tab => {
             const active = pickerBodyPart === tab.key;
@@ -190,12 +200,16 @@ export default function CreateWorkoutScreen() {
                 key={String(tab.key)}
                 style={[
                   styles.pickerTab,
+                  { borderColor: color },
                   active && { backgroundColor: color },
-                  !active && { borderColor: color + '50', borderWidth: 1 },
                 ]}
                 onPress={() => setPickerBodyPart(active ? null : tab.key)}
+                activeOpacity={0.75}
               >
-                <Text style={[styles.pickerTabText, active && { color: '#fff' }, !active && { color }]}>
+                <Text style={[
+                  styles.pickerTabText,
+                  { color: active ? '#fff' : color },
+                ]}>
                   {tab.label}
                 </Text>
               </TouchableOpacity>
@@ -203,10 +217,11 @@ export default function CreateWorkoutScreen() {
           })}
         </ScrollView>
 
-        {/* Lista de ejercicios */}
+        {/* Lista de ejercicios — flex:1 para que ocupe el espacio restante */}
         <FlatList
           data={pickerExercises}
           keyExtractor={item => item.exercise_id}
+          style={{ flex: 1 }}
           contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 40 }}
           renderItem={({ item }) => {
             const isAdded = selectedExercises.some(e => e.exercise_id === item.exercise_id);
@@ -286,16 +301,32 @@ export default function CreateWorkoutScreen() {
           {/* Nombre del entrenamiento */}
           <TextInput
             testID="workout-name-input"
-            style={styles.nameInput}
-            placeholder="Nombre (ej: Día de Pecho)"
+            style={[styles.nameInput, errors.name ? { borderBottomColor: COLORS.danger } : null]}
+            placeholder="Nombre (ej: Día de Pecho) — opcional"
             placeholderTextColor={COLORS.textSecondary}
             value={workoutName}
-            onChangeText={setWorkoutName}
+            onChangeText={v => { setWorkoutName(v); setErrors(e => ({ ...e, name: undefined })); }}
             returnKeyType="done"
           />
 
           {/* Sección ejercicios */}
-          <Text style={styles.sectionLabel}>EJERCICIOS ({selectedExercises.length})</Text>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionLabel}>EJERCICIOS ({selectedExercises.length})</Text>
+            {errors.exercises ? (
+              <View style={styles.errorBadge}>
+                <Ionicons name="warning" size={13} color={COLORS.danger} />
+                <Text style={styles.errorText}>{errors.exercises}</Text>
+              </View>
+            ) : null}
+          </View>
+
+          {/* Error de guardado */}
+          {errors.save ? (
+            <View style={styles.errorBanner}>
+              <Ionicons name="alert-circle" size={16} color={COLORS.danger} />
+              <Text style={styles.errorBannerText}>{errors.save}</Text>
+            </View>
+          ) : null}
 
           {selectedExercises.map((ex, idx) => (
             <View key={ex.exercise_id} style={styles.exCard} testID={`workout-exercise-${idx}`}>
@@ -416,10 +447,25 @@ const styles = StyleSheet.create({
     paddingBottom: 10, marginBottom: 28,
   },
 
+  sectionHeader:  { marginBottom: 12, gap: 6 },
   sectionLabel: {
     fontSize: 11, fontWeight: '800', color: COLORS.textSecondary,
-    letterSpacing: 1.8, marginBottom: 12,
+    letterSpacing: 1.8,
   },
+  errorBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    backgroundColor: '#FEF2F2', borderRadius: 8,
+    paddingHorizontal: 10, paddingVertical: 6,
+    borderWidth: 1, borderColor: '#FECACA',
+  },
+  errorText: { fontSize: 13, fontWeight: '600', color: COLORS.danger, flex: 1 },
+  errorBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: '#FEF2F2', borderRadius: 10,
+    padding: 12, marginBottom: 16,
+    borderWidth: 1, borderColor: '#FECACA',
+  },
+  errorBannerText: { fontSize: 13, fontWeight: '600', color: COLORS.danger, flex: 1 },
 
   // ─── Tarjeta de ejercicio ──────────────────────────────
   exCard: {
@@ -481,22 +527,28 @@ const styles = StyleSheet.create({
 
   pickerSearch: {
     flexDirection: 'row', alignItems: 'center',
-    marginHorizontal: 16, marginTop: 12, marginBottom: 8,
-    backgroundColor: COLORS.surface, borderRadius: 12,
-    paddingHorizontal: 12, height: 44, gap: 8,
+    marginHorizontal: 16, marginTop: 12, marginBottom: 4,
+    backgroundColor: COLORS.surface, borderRadius: 14,
+    paddingHorizontal: 14, height: 48, gap: 10,
     borderWidth: 1, borderColor: COLORS.border,
   },
-  pickerSearchInput: { flex: 1, fontSize: 15, color: COLORS.text },
+  pickerSearchInput: { flex: 1, fontSize: 16, color: COLORS.text },
 
   // Tabs de grupo muscular
+  pickerTabsScroll: {
+    flexGrow: 0,    // No expandirse verticalmente
+    flexShrink: 0,
+  },
   pickerTabs: {
-    paddingHorizontal: 16, paddingBottom: 12, paddingTop: 4, gap: 8,
+    paddingHorizontal: 16, paddingVertical: 10, gap: 8,
+    alignItems: 'center', flexDirection: 'row',
   },
   pickerTab: {
-    paddingHorizontal: 14, paddingVertical: 6,
-    borderRadius: 20, backgroundColor: 'transparent',
+    paddingHorizontal: 16, paddingVertical: 8,
+    borderRadius: 22, borderWidth: 2,
+    backgroundColor: 'transparent',
   },
-  pickerTabText: { fontSize: 13, fontWeight: '700' },
+  pickerTabText: { fontSize: 14, fontWeight: '800' },
 
   // Lista de ejercicios del picker
   pickerItem: {

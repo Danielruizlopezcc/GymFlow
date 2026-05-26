@@ -81,6 +81,7 @@ export async function deleteWorkout(id: string): Promise<void> {
     .from('workouts')
     .delete()
     .eq('id', id);
+
   if (error) throw error;
 }
 

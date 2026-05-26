@@ -28,6 +28,7 @@ export default function CalendarScreen() {
   const [workoutDates, setWorkoutDates] = useState<Set<string>>(new Set());
   const [loading, setLoading]           = useState(true);
   const [refreshing, setRefreshing]     = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const router  = useRouter();
   const insets  = useSafeAreaInsets();
 
@@ -48,24 +49,10 @@ export default function CalendarScreen() {
 
   useEffect(() => { fetchWorkouts(); }, [currentDate]);
 
-  const handleDelete = async (workoutId: string) => {
-    Alert.alert(
-      'Eliminar Entrenamiento',
-      '¿Seguro que quieres eliminar este entrenamiento?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Eliminar', style: 'destructive', onPress: async () => {
-            try {
-              await deleteWorkout(workoutId);
-              fetchWorkouts(true);
-            } catch {
-              Alert.alert('Error', 'No se pudo eliminar el entrenamiento');
-            }
-          },
-        },
-      ]
-    );
+  const handleDelete = (workoutId: string) => {
+    deleteWorkout(workoutId)
+      .then(() => { setConfirmDeleteId(null); fetchWorkouts(true); })
+      .catch((e) => console.error('[Calendar] delete error:', e));
   };
 
   const navigateMonth = (dir: number) => {
@@ -187,30 +174,11 @@ export default function CalendarScreen() {
             selectedWorkouts.map(w => (
               <View key={w.id} style={styles.workoutCard} testID={`workout-card-${w.id}`}>
 
-                {/* Cabecera de la tarjeta */}
+                {/* Nombre */}
                 <View style={styles.workoutCardHeader}>
                   <View style={[styles.colorDot, { backgroundColor: COLORS.accent }]} />
                   <Text style={styles.workoutName} numberOfLines={1}>{w.name}</Text>
                   <Text style={styles.workoutExCount}>{w.exercises.length} ejerc.</Text>
-                  {/* Botón Editar */}
-                  <TouchableOpacity
-                    testID={`edit-workout-${w.id}`}
-                    style={styles.iconBtn}
-                    onPress={() => router.push({
-                      pathname: '/workout/create',
-                      params: { date: w.date, workoutId: w.id },
-                    })}
-                  >
-                    <Ionicons name="create-outline" size={18} color={COLORS.accent} />
-                  </TouchableOpacity>
-                  {/* Botón Eliminar */}
-                  <TouchableOpacity
-                    testID={`delete-workout-${w.id}`}
-                    style={styles.iconBtn}
-                    onPress={() => handleDelete(w.id)}
-                  >
-                    <Ionicons name="trash-outline" size={18} color={COLORS.danger} />
-                  </TouchableOpacity>
                 </View>
 
                 {/* Ejercicios */}
@@ -222,12 +190,64 @@ export default function CalendarScreen() {
                       <Image source={{ uri: getGifUrl(ex.exercise_id) }} style={styles.exGif} />
                       <Text style={styles.exName} numberOfLines={1}>{ex.name}</Text>
                       <Text style={styles.exSets}>{ex.sets}×{ex.reps}</Text>
-                      {ex.weight ? (
-                        <Text style={styles.exWeight}>{ex.weight} kg</Text>
-                      ) : null}
+                      {ex.weight ? <Text style={styles.exWeight}>{ex.weight} kg</Text> : null}
                     </View>
                   ))
                 )}
+
+                {/* Acciones */}
+                {confirmDeleteId === w.id ? (
+                  /* Confirmación inline */
+                  <View style={styles.confirmBox}>
+                    <Text style={styles.confirmText}>¿Eliminar este entrenamiento?</Text>
+                    <View style={styles.confirmButtons}>
+                      <TouchableOpacity
+                        style={styles.confirmCancel}
+                        activeOpacity={0.7}
+                        onPress={() => setConfirmDeleteId(null)}
+                      >
+                        <Text style={styles.confirmCancelText}>Cancelar</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.confirmDelete}
+                        activeOpacity={0.7}
+                        onPress={() => handleDelete(w.id)}
+                      >
+                        <Ionicons name="trash-outline" size={15} color="#fff" />
+                        <Text style={styles.confirmDeleteText}>Sí, eliminar</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ) : (
+                  /* Botones normales */
+                  <View style={styles.workoutActions}>
+                    <TouchableOpacity
+                      testID={`edit-workout-${w.id}`}
+                      style={styles.actionBtn}
+                      activeOpacity={0.6}
+                      onPress={() => router.push({
+                        pathname: '/workout/create',
+                        params: { date: w.date, workoutId: w.id },
+                      })}
+                    >
+                      <Ionicons name="create-outline" size={16} color={COLORS.accent} />
+                      <Text style={[styles.actionBtnText, { color: COLORS.accent }]}>Editar</Text>
+                    </TouchableOpacity>
+
+                    <View style={styles.actionDivider} />
+
+                    <TouchableOpacity
+                      testID={`delete-workout-${w.id}`}
+                      style={styles.actionBtn}
+                      activeOpacity={0.6}
+                      onPress={() => setConfirmDeleteId(w.id)}
+                    >
+                      <Ionicons name="trash-outline" size={16} color={COLORS.danger} />
+                      <Text style={[styles.actionBtnText, { color: COLORS.danger }]}>Eliminar</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
               </View>
             ))
 
@@ -343,6 +363,46 @@ const styles = StyleSheet.create({
   exWeight: { fontSize: 12, fontWeight: '600', color: COLORS.textSecondary },
 
   noExText: { fontSize: 13, color: COLORS.textSecondary, fontStyle: 'italic', paddingTop: 4 },
+
+  // ─── Acciones de la tarjeta ────────────────────────────
+  // ─── Botones de acción normales ───────────────────────
+  workoutActions: {
+    flexDirection: 'row',
+    borderTopWidth: 1, borderTopColor: COLORS.border,
+    marginTop: 10,
+  },
+  actionBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 6, paddingVertical: 12,
+  },
+  actionBtnText:  { fontSize: 14, fontWeight: '700' },
+  actionDivider:  { width: 1, backgroundColor: COLORS.border, marginVertical: 8 },
+
+  // ─── Confirmación de borrado ───────────────────────────
+  confirmBox: {
+    borderTopWidth: 1, borderTopColor: COLORS.border,
+    marginTop: 10, paddingTop: 12, gap: 10,
+  },
+  confirmText: {
+    fontSize: 14, fontWeight: '600', color: COLORS.text,
+    textAlign: 'center',
+  },
+  confirmButtons: {
+    flexDirection: 'row', gap: 10,
+  },
+  confirmCancel: {
+    flex: 1, paddingVertical: 11, borderRadius: 12,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: COLORS.surface,
+    borderWidth: 1, borderColor: COLORS.border,
+  },
+  confirmCancelText: { fontSize: 14, fontWeight: '700', color: COLORS.text },
+  confirmDelete: {
+    flex: 1, paddingVertical: 11, borderRadius: 12,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 6, backgroundColor: COLORS.danger,
+  },
+  confirmDeleteText: { fontSize: 14, fontWeight: '700', color: '#fff' },
 
   // ─── Vacío ─────────────────────────────────────────────
   emptyDay:      { alignItems: 'center', paddingTop: 44, paddingBottom: 24, gap: 8 },
