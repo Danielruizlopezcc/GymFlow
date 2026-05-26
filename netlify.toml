@@ -1,0 +1,13 @@
+[build]
+  base    = "frontend"
+  command = "npx expo export -p web"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# Rutas dinámicas (ej: /exercise/bench-press) → deja que Expo Router las maneje
+[[redirects]]
+  from   = "/*"
+  to     = "/index.html"
+  status = 200
