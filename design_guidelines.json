@@ -1,0 +1,127 @@
+{
+  "theme": "Light",
+  "archetype": "Performance Pro (Archetype 2 - Adapted for Light Mode)",
+  "vibe": "Clean, High-Contrast, Action-Oriented, Tactical Minimalism",
+  "typography": {
+    "heading_font": "Barlow Condensed",
+    "body_font": "Manrope",
+    "hierarchy": {
+      "h1": "text-4xl sm:text-5xl font-black tracking-tight leading-none uppercase",
+      "h2": "text-2xl sm:text-3xl font-bold tracking-tight uppercase",
+      "h3": "text-xl font-bold uppercase tracking-wide",
+      "h4": "text-lg font-semibold",
+      "body": "text-base leading-relaxed text-zinc-600",
+      "small_label": "text-xs font-bold uppercase tracking-[0.2em] text-zinc-500"
+    },
+    "rules": [
+      "Use tight letter spacing for headings.",
+      "Overlines and small labels MUST be uppercase with wide spacing tracking-[0.2em].",
+      "Use Barlow Condensed for all workout names, days, and major numeric stats.",
+      "Use Manrope for instructional text, history logs, and secondary details."
+    ]
+  },
+  "colors": {
+    "background": {
+      "base": "bg-white",
+      "surface": "bg-zinc-50",
+      "surface_elevated": "bg-white",
+      "overlay": "bg-zinc-950/40"
+    },
+    "text": {
+      "primary": "text-zinc-950",
+      "secondary": "text-zinc-500",
+      "accent": "text-blue-600",
+      "inverse": "text-white"
+    },
+    "border": "border-zinc-200",
+    "accents": {
+      "primary": "bg-blue-600 hover:bg-blue-700",
+      "secondary": "bg-zinc-900 hover:bg-zinc-800",
+      "success": "bg-green-500",
+      "warning": "bg-amber-500"
+    },
+    "rules": [
+      "Keep the interface overwhelmingly white and light grey (clean card-based).",
+      "Use pure zinc-950 for primary text to ensure high contrast.",
+      "Accent color (blue-600) should be reserved for primary actions (Start Workout, Add Set) and active tab states.",
+      "Never use pure black or grey without a slight tint (using zinc which has a subtle cool/blue undertone)."
+    ]
+  },
+  "spacing_and_layout": {
+    "container": "max-w-md mx-auto h-screen bg-white shadow-2xl overflow-hidden flex flex-col relative",
+    "padding": {
+      "screen": "p-4 sm:p-6",
+      "card": "p-4",
+      "list_item": "py-3 px-4"
+    },
+    "radius": "rounded-2xl for primary cards, rounded-xl for inner elements, rounded-full for buttons/pills",
+    "grids": "Use flex-col with gap-4 or gap-6 for vertical lists. Use grid-cols-2 gap-4 for split stats.",
+    "rules": [
+      "Maintain a mobile-first layout (simulate a mobile app wrapper if viewed on desktop).",
+      "Cards should use 1px borders (border-zinc-200) instead of heavy shadows for that clean 'Lyfta' look.",
+      "Use sticky headers for the active workout or navigation."
+    ]
+  },
+  "components": {
+    "buttons": "rounded-full font-bold uppercase tracking-wider h-12 flex items-center justify-center transition-transform active:scale-95",
+    "cards": "bg-white border border-zinc-200 rounded-2xl overflow-hidden",
+    "tabs": "flex p-1 bg-zinc-100 rounded-lg. Active tab: bg-white shadow-sm text-zinc-950 rounded-md. Inactive tab: text-zinc-500",
+    "inputs": "bg-zinc-50 border-transparent focus:border-blue-600 focus:ring-2 focus:ring-blue-100 rounded-xl h-12 px-4",
+    "bottom_nav": "fixed bottom-0 w-full max-w-md bg-white border-t border-zinc-200 pb-safe pt-2 px-6 flex justify-between items-center z-50",
+    "rules": [
+      "Use Shadcn primitives but heavily customize classes to remove default Vercel-look.",
+      "Exercise library should have a search bar and muscle group filter pills (horizontal scrollable).",
+      "Workout Calendar: Use Shadcn Calendar, style it flat without shadows, blue indicator for workout days."
+    ]
+  },
+  "motion_and_interactions": {
+    "hover_states": "Subtle background darken (hover:bg-zinc-100) or border color change.",
+    "active_states": "Scale down (active:scale-95) for primary buttons and list items to mimic native mobile feel.",
+    "page_transitions": "Slide up for modals/exercise details, standard opacity fade for tabs.",
+    "rules": [
+      "Must respect prefers-reduced-motion.",
+      "All interactive elements MUST have data-testid attributes (e.g., data-testid='start-workout-button')."
+    ]
+  },
+  "icons": {
+    "library": "lucide-react",
+    "sizing": "w-6 h-6 for nav, w-5 h-5 for inline icons",
+    "stroke_width": "2.5 for a bolder, more athletic feel matching the font"
+  },
+  "media": {
+    "image_urls": [
+      {
+        "url": "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2MzR8MHwxfHNlYXJjaHwxfHxhdGhsZXRlJTIwZ3ltJTIwdHJhaW5pbmclMjBjbGVhbnxlbnwwfHx8fDE3Nzk3ODA5NTd8MA&ixlib=rb-4.1.0&q=85",
+        "category": "Hero/Background",
+        "description": "Person about to lift barbell. Use for empty states, welcome screen, or auth screen background."
+      },
+      {
+        "url": "https://images.pexels.com/photos/32961908/pexels-photo-32961908.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+        "category": "Exercise Placeholder",
+        "description": "Athletic young man performing a snatch lift. Use as a placeholder for exercise detail GIF/video area."
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1581009146145-b5ef050c2e1e?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2MzR8MHwxfHNlYXJjaHw0fHxhdGhsZXRlJTIwZ3ltJTIwdHJhaW5pbmclMjBjbGVhbnxlbnwwfHx8fDE3Nzk3ODA5NTd8MA&ixlib=rb-4.1.0&q=85",
+        "category": "Routine Thumbnail",
+        "description": "Topless man in black shorts carrying black dumbbell. Use for workout routine cover images."
+      }
+    ],
+    "rules": [
+      "Use placeholder images from this list if an exercise GIF is not available dynamically.",
+      "Images should have a very subtle dark gradient overlay at the bottom if text needs to sit on them (bg-gradient-to-t from-black/60 to-transparent)."
+    ]
+  },
+  "instructions_to_main_agent": [
+    "You are building a responsive web app that acts and feels like a native mobile app (React Native Expo equivalent in React web for this environment).",
+    "Implement a main container with 'max-w-md mx-auto h-screen relative flex flex-col bg-zinc-50' to restrict desktop view to mobile proportions.",
+    "Implement Google Auth + JWT flow as requested. Provide a clean login screen using the provided Hero image.",
+    "For the Exercise detail page: Use a large hero area for the image/GIF, followed by a rounded-t-3xl white sheet that pulls up over it containing the tabs (About, History, Progress).",
+    "Implement the 'About' tab to show primary/secondary muscles and instructions.",
+    "Implement the 'History' tab with a clean list of past sets/reps.",
+    "Implement a 'Similar Exercises' horizontal scroll list at the bottom of the detail page.",
+    "For the workout planner, integrate a Calendar view using Shadcn, allowing users to pick a date and assign a routine.",
+    "Ensure 'data-testid' is added to every button, tab, and input.",
+    "Use 'Barlow Condensed' for headings. You may need to import it via Google Fonts in index.html or CSS (@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800;900&family=Manrope:wght@400;500;600;700&display=swap');).",
+    "Strictly follow the color palette: white cards, zinc-50 backgrounds, zinc-200 borders, blue-600 primary accents, zinc-950 high-contrast text."
+  ]
+}
